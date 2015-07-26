@@ -199,5 +199,5 @@ buildAsset h aId ad = do
                     -- logger lock $ "Pub: " ++ (publicIdentifier result)
                     -- logger lock $ res
 
-                    finishBuilding h aId result
                     atomically $ writeTQueue (emitStream h) $ emitResult ad h aId result
+                    finishBuilding h aId result

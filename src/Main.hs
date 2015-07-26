@@ -74,6 +74,9 @@ run opt (Build outputDir) = do
         e <- isEmptyTQueue (messages h)
         unless e retry
 
+    atomically $ do
+        e <- isEmptyTQueue (emitStream h)
+        unless e retry
 
 run opt Serve = do
     config <- mkConfig opt ""
