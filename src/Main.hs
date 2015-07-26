@@ -29,13 +29,8 @@ import           Data.Mole.Types
 import           Data.Mole.Core
 import           Data.Mole.Server
 import           Data.Mole.Watcher
-
-import           Data.Mole.Builder.Html
-import           Data.Mole.Builder.Binary
+import           Data.Mole.Builder
 import           Data.Mole.Builder.External
-import           Data.Mole.Builder.JavaScript
-import           Data.Mole.Builder.Image
-import           Data.Mole.Builder.Stylesheet
 
 import           Options.Applicative
 import           Options.Applicative.Types
@@ -110,17 +105,6 @@ collectAssetDefinitions outputDir basePath = do
 transformPublicIdentifierDef :: PublicIdentifier -> PublicIdentifier
 transformPublicIdentifierDef ('/':pubId) = '/' : pubId
 transformPublicIdentifierDef pubId       = '/' : pubId
-
-
-builderForFile :: FilePath -> String -> Handle -> AssetId -> IO Builder
-builderForFile basePath x = case takeExtension x of
-    ".css"  -> stylesheetBuilder x x
-    ".html" -> htmlBuilder (drop (length basePath) x) x
-    ".js"   -> javascriptBuilder x
-    ".png"  -> imageBuilder x "image/png"
-    ".jpeg" -> imageBuilder x "image/jpeg"
-    ".jpg"  -> imageBuilder x "image/jpeg"
-    _       -> binaryBuilder x "application/octet-stream"
 
 
 defAutoDiscovery :: Options -> FilePath -> Handle -> AssetId -> IO (Maybe AssetDefinition)
