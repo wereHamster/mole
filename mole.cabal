@@ -1,0 +1,72 @@
+name:                mole
+version:             0.0.1
+
+synopsis:            empty
+description:         empty
+
+license:             MIT
+license-file:        LICENSE
+author:              Tomas Carnecky
+maintainer:          tomas.carnecky@gmail.com
+
+category:            System
+
+build-type:          Simple
+cabal-version:       >=1.10
+
+
+executable mole
+    hs-source-dirs:      src
+    default-language:    Haskell2010
+
+    ghc-options:         -Wall
+
+    main-is:             Main.hs
+
+    build-depends:
+       base >=4.8 && <4.9
+     , containers
+     , bytestring
+     , base64-bytestring
+     , tagsoup
+     , stm
+     , cryptohash
+     , filepath
+     , filemanip
+     , fsnotify
+     , directory
+     , system-filepath
+     , snap
+     , snap-server
+     , text
+     , transformers
+     , process
+     , attoparsec
+     , network-uri
+     , optparse-applicative
+     , time
+     , mtl
+     , kraken
+     , unix
+
+test-suite spec
+  hs-source-dirs:      src test
+  default-language:    Haskell2010
+
+  main-is:             Test.hs
+  type:                exitcode-stdio-1.0
+
+  build-depends:
+     base < 4.9
+   , hspec
+   , smallcheck
+   , hspec-smallcheck
+   , vector
+   , text
+   , unordered-containers
+   , time
+   , kraken
+   , attoparsec
+   , stm
+   , bytestring
+   , containers
