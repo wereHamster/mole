@@ -1,8 +1,13 @@
 name:                mole
 version:             0.0.1
 
-synopsis:            empty
-description:         empty
+synopsis:            A glorified string replacement tool
+description:
+    A glorified string replacement tool. For a very specific purpose. That
+    purpose being to compile and optimize a static website (or a single-page
+    application). Mole inspects source, builds a complete dependency tree,
+    minifies and compresses the files, adds fingerprints and writes the result
+    to a directory.
 
 license:             MIT
 license-file:        LICENSE
@@ -15,6 +20,11 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 
+source-repository head
+    type:     git
+    location: git://github.com/wereHamster/mole.git
+
+
 executable mole
     hs-source-dirs:      src
     default-language:    Haskell2010
@@ -24,7 +34,7 @@ executable mole
     main-is:             Main.hs
 
     build-depends:
-       base >=4.8 && <4.9
+       base >=4.6 && <4.9
      , containers
      , bytestring
      , base64-bytestring
@@ -49,24 +59,25 @@ executable mole
      , kraken
      , unix
 
+
 test-suite spec
-  hs-source-dirs:      src test
-  default-language:    Haskell2010
+    hs-source-dirs:      src test
+    default-language:    Haskell2010
 
-  main-is:             Test.hs
-  type:                exitcode-stdio-1.0
+    main-is:             Test.hs
+    type:                exitcode-stdio-1.0
 
-  build-depends:
-     base < 4.9
-   , hspec
-   , smallcheck
-   , hspec-smallcheck
-   , vector
-   , text
-   , unordered-containers
-   , time
-   , kraken
-   , attoparsec
-   , stm
-   , bytestring
-   , containers
+    build-depends:
+       base <4.9
+     , hspec
+     , smallcheck
+     , hspec-smallcheck
+     , vector
+     , text
+     , unordered-containers
+     , time
+     , kraken
+     , attoparsec
+     , stm
+     , bytestring
+     , containers
