@@ -43,13 +43,17 @@ newHandle config = do
             , msg
             ]
 
+    e <- newTQueueIO
+    void $ forkIO $ forever $ do
+        join $ atomically $ readTQueue e
+
     kH <- runMaybeT $ do
         apiKey <- MaybeT $ lookupEnv "KRAKEN_API_KEY"
         apiSecret <- MaybeT $ lookupEnv "KRAKEN_API_SECRET"
 
         MaybeT $ Just <$> K.newHandle (K.Config apiKey apiSecret)
 
-    let h = Handle st msgs kH l
+    let h = Handle st msgs e kH l
 
     tId <- forkIO $ forever $ do
         da <- dirtyAssets st
@@ -61,7 +65,7 @@ newHandle config = do
                 case assetDef of
                     Nothing -> do -- failBuild h aId (AssetNotFound aId)
                         logMessage h aId $ "Asset not found, treating as external!: " ++ show aId
-                        buildAsset h aId $ AssetDefinition (externalBuilder $ unAssetId aId) id (\_ _ -> return ())
+                        buildAsset h aId $ AssetDefinition (externalBuilder $ unAssetId aId) id (\_ _ _ -> return ())
                     Just ad -> do
                         -- logMessage h aId $ "Building"
                         buildAsset h aId ad
@@ -196,4 +200,4 @@ buildAsset h aId ad = do
                     -- logger lock $ res
 
                     finishBuilding h aId result
-                    emitResult ad aId result
+                    atomically $ writeTQueue (emitStream h) $ emitResult ad h aId result

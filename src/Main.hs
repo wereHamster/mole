@@ -108,14 +108,14 @@ transformPublicIdentifierDef pubId       = '/' : pubId
 
 
 defAutoDiscovery :: Options -> FilePath -> Handle -> AssetId -> IO (Maybe AssetDefinition)
-defAutoDiscovery opt outputDir _ (AssetId aId)
+defAutoDiscovery opt outputDir h (AssetId aId)
     | aId == "" = do
         return $ Just $ AssetDefinition (externalBuilder aId) id (emitResultDef outputDir)
     | isURI aId = do
         return $ Just $ AssetDefinition (externalBuilder aId) id (emitResultDef outputDir)
-    | head aId == '/' = do
+    -- | head aId == '/' = do
         -- logMessage h (AssetId aId) $ "Starts with a slash, treating as external!"
-        return $ Just $ AssetDefinition (externalBuilder aId) id (emitResultDef outputDir)
+        -- return $ Just $ AssetDefinition (externalBuilder aId) id (emitResultDef outputDir)
     | otherwise = do
         res <- concat <$> mapM (\basePath -> do
                 paths <- FPF.find (pure True) f basePath
@@ -132,13 +132,15 @@ defAutoDiscovery opt outputDir _ (AssetId aId)
   where
     f = do
         p <- filePath
-        return $ isSuffixOf aId p
+        t <- fileType
+        return $ t == RegularFile && isSuffixOf aId p
 
-emitResultDef :: FilePath -> AssetId -> Result -> IO ()
-emitResultDef dist _ (Result pubId mbRes) = do
+emitResultDef :: FilePath -> Handle -> AssetId -> Result -> IO ()
+emitResultDef dist _ _ (Result pubId mbRes) = do
     case mbRes of
         Nothing -> return ()
         Just (body, _) -> when (dist /= "") $ do
+            -- putStrLn $ "emit " ++ pubId
             createDirectoryIfMissing True $ dist `joinDrive` (takeDirectory pubId)
             BS.writeFile (dist `joinDrive` pubId) body
 
@@ -182,7 +184,7 @@ assetRead :: ReadM (AssetId, AssetDefinition)
 assetRead = ReadM $ do
     v <- ask
     case map T.unpack $ T.splitOn "=" $ T.pack v of
-        [aId, p] -> return $ (AssetId aId, AssetDefinition (externalBuilder p) id (\_ _ -> return ()))
+        [aId, p] -> return $ (AssetId aId, AssetDefinition (externalBuilder p) id (\_ _ _ -> return ()))
         _ -> fail "ASSET=DEFINITION"
 
 parseAsset :: Parser (AssetId, AssetDefinition)

@@ -122,7 +122,7 @@ data AssetDefinition = AssetDefinition
       -- prepend for example "/assets/". If you use a CDN, make the pubId a
       -- full URL.
 
-    , emitResult :: AssetId -> Result -> IO ()
+    , emitResult :: Handle -> AssetId -> Result -> IO ()
       -- ^ Action which is invoked every time an asset has completed building.
       -- This is useful if you want to store the asset in an output directory
       -- or maybe even directly upload to the server.
@@ -149,7 +149,14 @@ data Message = Message UTCTime AssetId String
 data Handle = Handle
     { state :: TVar State
     , messages :: TQueue Message
+
+    , emitStream :: TQueue (IO ())
+      -- ^ This is used to serialize the emit actions. This is required because
+      -- two different AssetIds may map to the same PublicIdentifier and
+      -- Haskell throws an exception when writing to the same file concurrently.
+
     , krakenH :: !(Maybe K.Handle)
     --, messageThreadId :: ThreadId
     , lock :: !(TMVar ())
+      -- ^ Generic lock for various things. Please make sure to not deadlock!
     }
