@@ -1,0 +1,10 @@
+#!/bin/sh
+set -e
+cd "$(dirname "$0")/.."
+
+
+curl -sLO https://www.stackage.org/nightly/cabal.config
+
+cabal update
+cabal sandbox init
+cabal install --only-dependencies --enable-test --enable-benchmark
