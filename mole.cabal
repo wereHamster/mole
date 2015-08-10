@@ -58,6 +58,7 @@ executable mole
      , mtl
      , kraken
      , unix
+     , css-syntax
 
 
 test-suite spec
