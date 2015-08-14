@@ -10,9 +10,8 @@ import qualified Data.Map as M
 
 import qualified Data.Set as S
 
-import qualified Data.ByteString.Char8 as BS
-
-import qualified Data.Text as T
+import qualified Data.Text          as T
+import qualified Data.Text.Encoding as T
 
 import           Data.Maybe
 import           Data.CSS.Syntax.Tokens
@@ -115,7 +114,7 @@ htmlBuilder pubId src _ _ = do
 
         t'' <- renderInlineStyles m t'
 
-        let body = BS.pack $ renderTags t''
+        let body = T.encodeUtf8 $ T.pack $ renderTags t''
         return $ Result pubId $ Just (body, "text/html")
 
     insertResult :: Map AssetId String -> Tag String -> Either Error (Tag String)
