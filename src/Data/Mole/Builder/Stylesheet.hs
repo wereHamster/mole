@@ -10,8 +10,9 @@ import qualified Data.Set as S
 
 import           Data.ByteString.Char8 (pack)
 
-import qualified Data.Text    as T
-import qualified Data.Text.IO as T
+import qualified Data.Text          as T
+import qualified Data.Text.Encoding as T
+import qualified Data.Text.IO       as T
 
 import           Data.Maybe
 
@@ -60,6 +61,7 @@ stylesheetBuilder pubId src _ _ = do
                 Just v -> Right (Url $ T.pack $ reconstructUrl (T.unpack x) v)
             _ -> return t
 
-        let body = T.unpack $ serialize newTokens
+        let bodyT = serialize newTokens
+        let body = T.unpack bodyT
 
-        return $ Result (fingerprint (pack body) pubId) $ Just (pack body, "text/css")
+        return $ Result (fingerprint (pack body) pubId) $ Just (T.encodeUtf8 bodyT, "text/css")
