@@ -186,6 +186,7 @@ buildAsset h aId ad = do
 
     updateMetadata h aId src depSet
 
+    -- putStrLn $ "Waiting for " ++ show depSet
     rd <- require h depSet
     case rd of
         Left e -> failBuild h aId e

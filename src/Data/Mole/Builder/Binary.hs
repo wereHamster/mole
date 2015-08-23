@@ -18,3 +18,14 @@ binaryBuilder src contentType _ _ = do
         , assetDependencies = S.empty
         , packageAsset      = const $ Right $ Result (fingerprint body src) $ Just (body, contentType)
         }
+
+
+-- | Like the 'binaryBuilder', but does not fingerprint the asset.
+rawBuilder :: PublicIdentifier -> String -> String -> Handle -> AssetId -> IO Builder
+rawBuilder pubId src contentType _ _ = do
+    body <- BS.readFile src
+    return $ Builder
+        { assetSources      = S.singleton src
+        , assetDependencies = S.empty
+        , packageAsset      = const $ Right $ Result pubId (Just (body, contentType))
+        }
