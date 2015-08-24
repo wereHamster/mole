@@ -57,7 +57,7 @@ data Options = Options
 data Command
     = Version
     | Build !FilePath
-    | Serve
+    | Serve !Int
 
 
 run :: Options -> Command -> IO ()
@@ -80,7 +80,7 @@ run opt (Build outputDir) = do
         e <- isEmptyTQueue (emitStream h)
         unless e retry
 
-run opt Serve = do
+run opt (Serve port) = do
     config <- mkConfig opt ""
     h <- newHandle config
 
@@ -91,7 +91,7 @@ run opt Serve = do
     forM_ (entryPoints config) $ \aId ->
         markDirty h aId
 
-    serveFiles h
+    serveFiles h port
 
 
 collectAssetDefinitions :: FilePath -> FilePath -> IO (Map AssetId AssetDefinition)
@@ -206,7 +206,8 @@ parseBuild = Build
     <$> strArgument (metavar "OUTPUT-DIRECTORY" <> help "Where to write the files to.")
 
 parseServe :: Parser Command
-parseServe = pure Serve
+parseServe = Serve
+    <$> option auto (long "port" <> short 'p' <> metavar "PORT" <> value 8000)
 
 assetIdRead :: ReadM AssetId
 assetIdRead = ReadM $ do
@@ -231,7 +232,7 @@ assetRead at = ReadM $ do
                 mbSource <- locateSource opt (AssetId aId)
                 case mbSource of
                     Nothing -> error $ "Could not find asset " ++ aId
-                    Just (basePath, p') -> do
+                    Just (_, p') -> do
                         return $ AssetDefinition (rawBuilder p p' "application/octet-stream") transformPublicIdentifierDef (emitResultDef outputDir)
             )
 

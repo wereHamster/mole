@@ -23,13 +23,13 @@ import           Data.Mole.Core
 
 
 
-serveFiles :: Handle -> IO ()
-serveFiles h = do
+serveFiles :: Handle -> Int -> IO ()
+serveFiles h port = do
     snapConfig <- do
         config <- return emptyConfig :: IO (SC.Config Snap ())
         return $ setAccessLog ConfigNoLog $ setErrorLog ConfigNoLog config
 
-    simpleHttpServe snapConfig (snapHandler h)
+    simpleHttpServe (SC.setPort port snapConfig) (snapHandler h)
 
 
 
