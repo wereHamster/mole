@@ -33,6 +33,22 @@ executable mole
 
     main-is:             Main.hs
 
+    other-modules:
+       Main
+     , Data.Mole.Builder.Internal.Fingerprint
+     , Data.Mole.Builder.Internal.Template
+     , Data.Mole.Builder.Binary
+     , Data.Mole.Builder.External
+     , Data.Mole.Builder.Html
+     , Data.Mole.Builder.Image
+     , Data.Mole.Builder.JavaScript
+     , Data.Mole.Builder.Stylesheet
+     , Data.Mole.Builder
+     , Data.Mole.Core
+     , Data.Mole.Server
+     , Data.Mole.Types
+     , Data.Mole.Watcher
+
     build-depends:
        base >=4.6 && <4.9
      , containers
