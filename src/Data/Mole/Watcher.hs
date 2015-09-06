@@ -19,8 +19,6 @@ import           System.FilePath
 import           System.Directory
 import           System.FSNotify hiding (defaultConfig)
 
-import           Filesystem.Path.CurrentOS (encodeString)
-
 import           Data.Mole.Types
 import           Data.Mole.Core
 
@@ -32,7 +30,7 @@ attachFileWatcher h = do
     void $ forkIO $ forever $ do
         withManager $ \mgr -> do
             stop <- watchTree mgr "." (const True) $ \ev -> do
-                let p = encodeString $ eventPath ev
+                let p = eventPath ev
                 rd <- reverseDependencies h cwd p
                 forM_ rd $ \aId -> do
                     logMessage h aId $ "Rebuilding because " ++ p ++ " was modified"
