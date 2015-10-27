@@ -20,6 +20,8 @@ import           Data.Mole.Types
 import           Data.Mole.Builder.External
 
 import           System.Environment
+import           System.IO (hFlush, stdout)
+
 import qualified Network.Kraken as K
 
 
@@ -42,6 +44,7 @@ newHandle config = do
             , " [ " <> take 24 (padL 24 (unAssetId aId)) <> " ] "
             , msg
             ]
+        hFlush stdout
 
     e <- newTQueueIO
     void $ forkIO $ forever $ do
