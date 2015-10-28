@@ -29,28 +29,33 @@ main :: IO ()
 main = do
     hspec $ spec
 
+bracket :: Bracket
+bracket = ("<*","*>")
+
+brackets :: Brackets
+brackets = [bracket]
 
 spec :: Spec
 spec = do
     describe "Data.Mole.Builder.Internal.Template" $ do
         it "should parse a non-empty string into a single literal" $ do
             property $ \x -> length x > 0 ==>
-                template x == Template [Lit $ T.pack x]
+                template brackets x == Template [Lit $ T.pack x]
         it "should strip whitespace around a var" $ do
-            template "<* \nvar \t *>" `shouldBe`
-                Template [ Var "var" ]
+            template brackets "<* \nvar \t *>" `shouldBe`
+                Template [ Var bracket "var" ]
         it "should parse a string with a var in it" $ do
-            template "some <* var *> template" `shouldBe`
-                Template [ Lit "some ", Var "var", Lit " template" ]
+            template brackets "some <* var *> template" `shouldBe`
+                Template [ Lit "some ", Var bracket "var", Lit " template" ]
         it "should parse two directly adjacent vars" $ do
-            template "<* v1 *><* v2 *>" `shouldBe`
-                Template [ Var "v1", Var "v2" ]
+            template brackets "<* v1 *><* v2 *>" `shouldBe`
+                Template [ Var bracket "v1", Var bracket "v2" ]
         it "should parse two adjacent vars with a whitespace in between" $ do
-            template "<* v1 *> <* v2 *>" `shouldBe`
-                Template [ Var "v1", Lit " ", Var "v2" ]
+            template brackets "<* v1 *> <* v2 *>" `shouldBe`
+                Template [ Var bracket "v1", Lit " ", Var bracket "v2" ]
         it "should ignore a false start of a var" $ do
-            template "<div><a href='<* var *>'>link</a></div>" `shouldBe`
-                Template [ Lit "<div><a href='", Var "var", Lit "'>link</a></div>" ]
+            template brackets "<div><a href='<* var *>'>link</a></div>" `shouldBe`
+                Template [ Lit "<div><a href='", Var bracket "var", Lit "'>link</a></div>" ]
         it "should allow literals between two false starts" $ do
-            template "<div> <hr> <* var *> <br>" `shouldBe`
-                Template [ Lit "<div> <hr> ", Var "var", Lit " <br>" ]
+            template brackets "<div> <hr> <* var *> <br>" `shouldBe`
+                Template [ Lit "<div> <hr> ", Var bracket "var", Lit " <br>" ]

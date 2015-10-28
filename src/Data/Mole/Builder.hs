@@ -16,7 +16,7 @@ builderForFile :: FilePath -> String -> Handle -> AssetId -> IO Builder
 builderForFile basePath x = case takeExtension x of
     ".css"  -> stylesheetBuilder x x
     ".html" -> htmlBuilder (drop (length basePath) x) x
-    ".js"   -> javascriptBuilder x
+    ".js"   -> javascriptBuilder (drop (length basePath) x) x
     ".png"  -> imageBuilder x "image/png"
     ".jpeg" -> imageBuilder x "image/jpeg"
     ".jpg"  -> imageBuilder x "image/jpeg"
