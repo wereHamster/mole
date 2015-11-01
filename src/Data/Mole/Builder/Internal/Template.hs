@@ -21,7 +21,7 @@ import           Data.Mole.Types
 type Bracket = (Text,Text)
 type Brackets = [Bracket]
 type Context = Bracket -> Text -> Either Error Text
-data Fragment = Lit Text | Var Bracket Text deriving (Show, Eq)
+data Fragment = Lit !Text | Var !Bracket !Text deriving (Show, Eq)
 newtype Template = Template [Fragment] deriving (Show, Eq)
 
 template :: Brackets -> String -> Template
