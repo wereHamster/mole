@@ -45,10 +45,10 @@ fragmentParser brackets = vars <|> lit
     var :: Bracket -> AP.Parser [Fragment]
     var bracket@(a,b) = do
         void $ AP.string a
-        text <- AP.scan "" $ \s c -> if T.isSuffixOf b s then Nothing else Just (s <> T.singleton c)
+        text <- AP.manyTill AP.anyChar (AP.string b)
         case text of
             "" -> fail "var"
-            _  -> return $ [Var bracket $ T.strip $ T.take (T.length text - T.length b) text]
+            _  -> return $ [Var bracket $ T.strip $ T.pack text]
 
     vars :: AP.Parser [Fragment]
     vars = foldl1 (<|>) (map var brackets)
