@@ -129,6 +129,18 @@ finishBuilding h aId res = do
     atomically $ do
         modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Completed res (diff $ arsState ars) }) aId (assets s) }
 
+    mbArs <- atomically $ do
+        s <- readTVar (state h)
+        return $ M.lookup aId (assets s)
+
+    case mbArs of
+        Nothing -> return ()
+        Just ars -> case arsState ars of
+            Completed _ td ->
+                logMessage h aId $ "Build time: " ++ show td
+            _ -> return ()
+
+
     -- Go through all reverse dependencies and mark them as dirty.
     rebuildReverseDependencies h aId
 
