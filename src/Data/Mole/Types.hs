@@ -6,7 +6,7 @@ import           Control.Concurrent.STM
 import           Data.ByteString (ByteString)
 import           Data.Map (Map)
 import           Data.Set (Set)
-import           Data.Time (UTCTime)
+import           Data.Time (UTCTime, NominalDiffTime)
 
 import qualified Network.Kraken as K
 
@@ -31,7 +31,18 @@ newtype BuildId = BuildId { unBuildId :: Int }
 type ContentType = String
 
 
-data AssetState = Dirty | Building | Failed Error | Completed Result
+data AssetState
+    = Dirty
+      -- ^ The asset is marked as dirty and needs to be built when some other
+      -- asset depends on it.
+
+    | Building !UTCTime
+      -- ^ A thread is currently building the asset. The timestamp is the time
+      -- when the thread was forked. It is used to keep track how long it took
+      -- to build the asset.
+
+    | Failed Error
+    | Completed !Result !NominalDiffTime
     deriving (Eq, Show)
 
 

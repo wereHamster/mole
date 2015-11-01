@@ -94,8 +94,8 @@ buildIfNecessary h aId = atomically $ do
     modifyTVar (state h) $ \s -> s { assets = M.insertWith adj aId (AssetRuntimeState Dirty S.empty S.empty) (assets s) }
   where
     adj _ ars = case arsState ars of
-        Building -> ars
-        Completed _ -> ars
+        Building _ -> ars
+        Completed _ _ -> ars
         _        -> ars { arsState = Dirty }
 
 
@@ -105,8 +105,10 @@ markDirty h aId = atomically $ do
 
 
 markBuilding :: Handle -> AssetId -> IO ()
-markBuilding h aId = atomically $ do
-    modifyTVar (state h) $ \s -> s { assets = M.insertWith (\_ ars -> ars { arsState = Building }) aId (AssetRuntimeState Building S.empty S.empty) (assets s) }
+markBuilding h aId = do
+    now <- getCurrentTime
+    atomically $ do
+        modifyTVar (state h) $ \s -> s { assets = M.insertWith (\_ ars -> ars { arsState = Building now }) aId (AssetRuntimeState (Building now) S.empty S.empty) (assets s) }
 
 
 failBuild :: Handle -> AssetId -> Error -> IO ()
@@ -119,18 +121,27 @@ failBuild h aId err = do
 
 finishBuilding :: Handle -> AssetId -> Result -> IO ()
 finishBuilding h aId res = do
+    now <- getCurrentTime
+
+    let diff (Building t0) = diffUTCTime now t0
+        diff _             = fromIntegral (0 :: Int)
+
     atomically $ do
-        modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Completed res }) aId (assets s) }
+        modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Completed res (diff $ arsState ars) }) aId (assets s) }
 
     -- Go through all reverse dependencies and mark them as dirty.
     rebuildReverseDependencies h aId
 
 
+isBuilding :: AssetState -> Bool
+isBuilding (Building _) = True
+isBuilding _            = False
+
 rebuildReverseDependencies :: Handle -> AssetId -> IO ()
 rebuildReverseDependencies h aId = do
     s <- atomically $ readTVar (state h)
     forM_ (M.toList $ assets s) $ \(aId', ars) -> do
-        when ((arsState ars /= Building) && S.member aId (arsDependencySet ars)) $ do
+        when ((not $ isBuilding $ arsState ars) && S.member aId (arsDependencySet ars)) $ do
             markDirty h aId'
 
 
@@ -146,7 +157,7 @@ require h assetIds = do
 
         let de = filter (\(aId, _) -> S.member aId assetIds) (M.toList (assets s))
         let completedPubRefs = catMaybes $ map (\(aId, ars) -> case (arsState ars) of
-                Completed res -> Just (aId, res)
+                Completed res _ -> Just (aId, res)
                 _ -> Nothing) de
 
         if length completedPubRefs == length assetIds
@@ -158,12 +169,12 @@ require h assetIds = do
 assetsByPublicIdentifier :: State -> PublicIdentifier -> [(AssetId, Result)]
 assetsByPublicIdentifier st pubId = filter (\(_,res) -> publicIdentifier res == pubId) $
     catMaybes $ map f $ M.assocs $ assets st
-  where f (aId, AssetRuntimeState (Completed res) _ _) = Just (aId, res)
+  where f (aId, AssetRuntimeState (Completed res _) _ _) = Just (aId, res)
         f _ = Nothing
 
 assetByPublicIdentifier :: State -> PublicIdentifier -> Maybe Result
 assetByPublicIdentifier st pubId = lookup pubId $ catMaybes $ map f $ M.elems $ assets st
-  where f (AssetRuntimeState (Completed res) _ _) = Just (publicIdentifier res, res)
+  where f (AssetRuntimeState (Completed res _) _ _) = Just (publicIdentifier res, res)
         f _ = Nothing
 
 
