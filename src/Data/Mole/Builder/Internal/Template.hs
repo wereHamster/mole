@@ -4,15 +4,13 @@ module Data.Mole.Builder.Internal.Template where
 
 
 import           Control.Applicative
-import           Control.Monad
-
-import qualified Data.Set as S
 
 import           Data.Text (Text)
 import qualified Data.Text as T
 
 import qualified Data.Attoparsec.Text as AP
 
+import           Data.Maybe
 import           Data.Monoid
 import           Data.Mole.Types
 
@@ -25,40 +23,52 @@ data Fragment = Lit !Text | Var !Bracket !Text deriving (Show, Eq)
 newtype Template = Template [Fragment] deriving (Show, Eq)
 
 template :: Brackets -> String -> Template
-template brackets input = case AP.parseOnly (AP.many1 $ fragmentParser brackets) (T.pack input) of
+template brackets input = case AP.parseOnly (fragmentParser brackets) (T.pack input) of
     Left  x -> error $ x ++ " on input '" ++ input ++ "'"
-    Right x -> Template $ mergeLiterals $ concat x
+    Right x -> Template $ mergeLiterals x
 
 mergeLiterals :: [Fragment] -> [Fragment]
 mergeLiterals = reverse . foldl f []
   where
-    f []           frag    = [frag]
-    f ((Lit a):xs) (Lit b) = (Lit $ a <> b) : xs
-    f acc          frag    = frag:acc
+    f acc          (Lit "") = acc
+    f ((Lit a):xs) (Lit b)  = (Lit $ a <> b) : xs
+    f acc          frag     = frag:acc
 
 fragmentParser :: Brackets -> AP.Parser [Fragment]
-fragmentParser brackets = vars <|> lit
+fragmentParser brackets = go
   where
-    firsts :: S.Set Char
-    firsts = S.fromList $ map (\(x,_) -> T.head x) brackets
+    go = lit <|> rest
 
-    var :: Bracket -> AP.Parser [Fragment]
-    var bracket@(a,b) = do
-        void $ AP.string a
-        text <- AP.manyTill AP.anyChar (AP.string b)
-        case text of
-            "" -> fail "var"
-            _  -> return $ [Var bracket $ T.strip $ T.pack text]
+    -- The rest of the input as a single 'Lit'. The contents of the text may be
+    -- empty, but we drop empty literals during postprocessing.
+    rest = pure . Lit <$> AP.takeText
 
-    vars :: AP.Parser [Fragment]
-    vars = foldl1 (<|>) (map var brackets)
+    -- Matches 'Text' which marks the beginning of a 'Var'.
+    varMarkers = foldl1 (<|>) $ map (AP.string . fst) brackets
 
-    lit :: AP.Parser [Fragment]
+    -- The contents of a variable and its end marker. The start marker must be
+    -- consumed before. This function recurses into 'go' to continue parsing
+    -- the rest of the input.
+    var (a,b) = do
+        text <- T.strip . T.pack <$> AP.manyTill AP.anyChar (AP.string b)
+        (Var (a, b) text :) <$> go
+
+    -- A literal (may be empty), up until the start marker of a var, followed
+    -- by a var.
     lit = do
-        c <- AP.takeTill $ flip S.member firsts
-        case c of
-            "" -> vars <|> (AP.anyChar >>= \ch -> return [Lit $ T.singleton ch])
-            _  -> return [Lit c]
+        (text, a) <- stringTill varMarkers
+        let b = fromJust $ lookup a brackets
+        (Lit (T.pack text) :) <$> var (a, b)
+
+    -- The string until 'end' matches. What matched at the end is returned, to
+    -- give the caller a chance to go different paths depending on how the
+    -- string ended.
+    stringTill end = scan
+        where scan = ((\x -> ([],x)) <$> end) <|> do
+                            x <- AP.anyChar
+                            (xs, e) <- scan
+                            return $ (x:xs, e)
+
 
 render :: Template -> Context -> Either Error String
 render (Template frags) ctxFunc = do
