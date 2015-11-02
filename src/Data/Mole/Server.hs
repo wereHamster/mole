@@ -14,7 +14,7 @@ import           Data.Monoid
 import           Data.Maybe
 import           Data.List (find)
 
-import           Snap.Http.Server (simpleHttpServe, setAccessLog, setErrorLog, ConfigLog(..), emptyConfig)
+import           Snap.Http.Server (simpleHttpServe, ConfigLog(..))
 import qualified Snap.Http.Server.Config as SC
 import           Snap (Snap, pass, getRequest, rqPathInfo, setContentType, modifyResponse, writeBS)
 
@@ -26,8 +26,8 @@ import           Data.Mole.Core
 serveFiles :: Handle -> Int -> IO ()
 serveFiles h port = do
     snapConfig <- do
-        config <- return emptyConfig :: IO (SC.Config Snap ())
-        return $ setAccessLog ConfigNoLog $ setErrorLog ConfigNoLog config
+        config <- return SC.emptyConfig :: IO (SC.Config Snap ())
+        return $ SC.setAccessLog ConfigNoLog $ SC.setErrorLog ConfigNoLog config
 
     simpleHttpServe (SC.setPort port snapConfig) (snapHandler h)
 
