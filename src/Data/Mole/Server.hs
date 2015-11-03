@@ -23,11 +23,12 @@ import           Data.Mole.Core
 
 
 
-serveFiles :: Handle -> Int -> IO ()
-serveFiles h port = do
+serveFiles :: Handle -> Int -> Maybe String -> IO ()
+serveFiles h port mbSocketPath = do
     snapConfig <- do
         config <- return SC.emptyConfig :: IO (SC.Config Snap ())
-        return $ SC.setAccessLog ConfigNoLog $ SC.setErrorLog ConfigNoLog config
+        let config' = SC.setAccessLog ConfigNoLog $ SC.setErrorLog ConfigNoLog config
+        return $ maybe config' (\x -> SC.setUnixSocket x config') mbSocketPath
 
     simpleHttpServe (SC.setPort port snapConfig) (snapHandler h)
 

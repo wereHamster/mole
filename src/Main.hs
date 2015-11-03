@@ -57,7 +57,7 @@ data Options = Options
 data Command
     = Version
     | Build !FilePath
-    | Serve !Int
+    | Serve !Int !(Maybe FilePath)
 
 
 run :: Options -> Command -> IO ()
@@ -80,7 +80,7 @@ run opt (Build outputDir) = do
         e <- isEmptyTQueue (emitStream h)
         unless e retry
 
-run opt (Serve port) = do
+run opt (Serve port mbSocketPath) = do
     config <- mkConfig opt ""
     h <- newHandle config
 
@@ -91,7 +91,7 @@ run opt (Serve port) = do
     forM_ (entryPoints config) $ \aId ->
         markDirty h aId
 
-    serveFiles h port
+    serveFiles h port mbSocketPath
 
 
 collectAssetDefinitions :: FilePath -> FilePath -> IO (Map AssetId AssetDefinition)
@@ -208,6 +208,7 @@ parseBuild = Build
 parseServe :: Parser Command
 parseServe = Serve
     <$> option auto (long "port" <> short 'p' <> metavar "PORT" <> value 8000)
+    <*> option (Just <$> str) (long "socket-path" <> short 'u' <> metavar "SOCKET-PATH" <> value Nothing)
 
 assetIdRead :: ReadM AssetId
 assetIdRead = ReadM $ do
