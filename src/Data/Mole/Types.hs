@@ -76,8 +76,15 @@ data Config = Config
 
 data AssetRuntimeState = AssetRuntimeState
     { arsState :: AssetState
+
     , arsSources :: Set FilePath
+      -- ^ This is a approximation of the set of files which make up the asset.
+      -- When any of these files change, the asset is marked as dirty.
+
     , arsDependencySet :: Set AssetId
+      -- ^ Assets which are depended on. These must be built before this asset
+      -- can be further processed. Also, if any of the dependencies changes,
+      -- this asset is rebuilt as well.
     } deriving (Show)
 
 
