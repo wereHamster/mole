@@ -34,6 +34,7 @@ javascriptBuilder pubId src _ _ = do
         { assetSources      = S.singleton src
         , assetDependencies = S.fromList deps
         , packageAsset      = r t
+        , sourceFingerprint = pack body
         }
 
   where

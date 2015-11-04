@@ -208,7 +208,7 @@ lookupAssetDefinition config h aId = case M.lookup aId (assetDefinitions config)
 
 buildAsset :: Handle -> AssetId -> AssetDefinition -> IO ()
 buildAsset h aId ad = do
-    Builder src depSet cont <- createBuilder ad h aId
+    Builder src depSet cont _ <- createBuilder ad h aId
 
     updateMetadata h aId src depSet
 

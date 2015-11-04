@@ -124,6 +124,13 @@ data Builder = Builder
     , packageAsset :: Map AssetId PublicIdentifier -> Either Error Result
       -- ^ A function which takes the public identifiers for all dependencies
       -- and creates the final asset package.
+
+    , sourceFingerprint :: ByteString
+      -- ^ Fingerprint of all sources which make up the asset. This can be the
+      -- hash of all the input files, or the contents themselves (if not too
+      -- large). This is used to avoid rebuilding the asset if the input hasn't
+      -- actually changed. Often only the atime changes, but that has
+      -- no relevance on the output.
     }
 
 

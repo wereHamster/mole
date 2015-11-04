@@ -13,6 +13,8 @@ import qualified Data.Set as S
 import qualified Data.Text          as T
 import qualified Data.Text.Encoding as T
 
+import           Data.ByteString.Char8 (pack)
+
 import           Data.Maybe
 import           Data.CSS.Syntax.Tokens
 
@@ -96,7 +98,7 @@ htmlBuilder pubId src _ _ = do
     let tags = parseTags body
     let deps = concatMap toDep tags
     let inlineStyleDeps = toInlineStyleDep [] tags
-    return $ Builder (S.singleton src) (S.fromList (deps ++ inlineStyleDeps)) (render tags)
+    return $ Builder (S.singleton src) (S.fromList (deps ++ inlineStyleDeps)) (render tags) (pack body)
 
   where
     toDep :: Tag String -> [AssetId]

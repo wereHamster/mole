@@ -17,6 +17,7 @@ binaryBuilder src contentType _ _ = do
         { assetSources      = S.singleton src
         , assetDependencies = S.empty
         , packageAsset      = const $ Right $ Result (fingerprint body src) $ Just (body, contentType)
+        , sourceFingerprint = body
         }
 
 
@@ -28,4 +29,5 @@ rawBuilder pubId src contentType _ _ = do
         { assetSources      = S.singleton src
         , assetDependencies = S.empty
         , packageAsset      = const $ Right $ Result pubId (Just (body, contentType))
+        , sourceFingerprint = body
         }

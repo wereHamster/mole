@@ -50,6 +50,7 @@ stylesheetBuilder pubId src _ _ = do
         { assetSources      = S.singleton src
         , assetDependencies = S.fromList deps
         , packageAsset      = r tokens
+        , sourceFingerprint = T.encodeUtf8 body
         }
 
   where
