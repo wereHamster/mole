@@ -12,6 +12,8 @@ import qualified Data.Map as M
 import           Data.Set (Set)
 import qualified Data.Set as S
 
+import           Data.ByteString (ByteString)
+
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Time
@@ -83,32 +85,32 @@ logMessage h aId msg = do
     atomically $ writeTQueue (messages h) (Message now aId msg)
 
 
-updateMetadata :: Handle -> AssetId -> Set FilePath -> Set AssetId -> IO ()
-updateMetadata h aId src ds = atomically $ do
+updateMetadata :: Handle -> AssetId -> Set FilePath -> Set AssetId -> ByteString -> IO ()
+updateMetadata h aId src ds fp = atomically $ do
     modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars {
-        arsSources = src, arsDependencySet = ds }) aId (assets s) }
+        arsSources = src, arsDependencySet = ds, arsSourceFingerprint = Just fp }) aId (assets s) }
 
 
 buildIfNecessary :: Handle -> AssetId -> IO ()
 buildIfNecessary h aId = atomically $ do
-    modifyTVar (state h) $ \s -> s { assets = M.insertWith adj aId (AssetRuntimeState Dirty S.empty S.empty) (assets s) }
+    modifyTVar (state h) $ \s -> s { assets = M.insertWith adj aId (AssetRuntimeState Dirty S.empty S.empty Nothing Nothing) (assets s) }
   where
     adj _ ars = case arsState ars of
-        Building _ -> ars
-        Completed _ _ -> ars
-        _        -> ars { arsState = Dirty }
+        Building _  -> ars
+        Completed _ -> ars
+        _           -> ars { arsState = Dirty }
 
 
 markDirty :: Handle -> AssetId -> IO ()
 markDirty h aId = atomically $ do
-    modifyTVar (state h) $ \s -> s { assets = M.insertWith (\_ ars -> ars { arsState = Dirty }) aId (AssetRuntimeState Dirty S.empty S.empty) (assets s) }
+    modifyTVar (state h) $ \s -> s { assets = M.insertWith (\_ ars -> ars { arsState = Dirty }) aId (AssetRuntimeState Dirty S.empty S.empty Nothing Nothing) (assets s) }
 
 
 markBuilding :: Handle -> AssetId -> IO ()
 markBuilding h aId = do
     now <- getCurrentTime
     atomically $ do
-        modifyTVar (state h) $ \s -> s { assets = M.insertWith (\_ ars -> ars { arsState = Building now }) aId (AssetRuntimeState (Building now) S.empty S.empty) (assets s) }
+        modifyTVar (state h) $ \s -> s { assets = M.insertWith (\_ ars -> ars { arsState = Building now }) aId (AssetRuntimeState (Building now) S.empty S.empty Nothing Nothing) (assets s) }
 
 
 failBuild :: Handle -> AssetId -> Error -> IO ()
@@ -127,7 +129,7 @@ finishBuilding h aId res = do
         diff _             = fromIntegral (0 :: Int)
 
     atomically $ do
-        modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Completed res (diff $ arsState ars) }) aId (assets s) }
+        modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Completed (diff $ arsState ars), arsResult = Just res }) aId (assets s) }
 
     mbArs <- atomically $ do
         s <- readTVar (state h)
@@ -136,7 +138,7 @@ finishBuilding h aId res = do
     case mbArs of
         Nothing -> return ()
         Just ars -> case arsState ars of
-            Completed _ td ->
+            Completed td ->
                 logMessage h aId $ "Build time: " ++ show td
             _ -> return ()
 
@@ -168,8 +170,8 @@ require h assetIds = do
         s <- readTVar (state h)
 
         let de = filter (\(aId, _) -> S.member aId assetIds) (M.toList (assets s))
-        let completedPubRefs = catMaybes $ map (\(aId, ars) -> case (arsState ars) of
-                Completed res _ -> Just (aId, res)
+        let completedPubRefs = catMaybes $ map (\(aId, ars) -> case (arsState ars, arsResult ars) of
+                (Completed _, Just res) -> Just (aId, res)
                 _ -> Nothing) de
 
         if length completedPubRefs == length assetIds
@@ -181,12 +183,12 @@ require h assetIds = do
 assetsByPublicIdentifier :: State -> PublicIdentifier -> [(AssetId, Result)]
 assetsByPublicIdentifier st pubId = filter (\(_,res) -> publicIdentifier res == pubId) $
     catMaybes $ map f $ M.assocs $ assets st
-  where f (aId, AssetRuntimeState (Completed res _) _ _) = Just (aId, res)
+  where f (aId, AssetRuntimeState (Completed _) _ _ _ (Just res)) = Just (aId, res)
         f _ = Nothing
 
 assetByPublicIdentifier :: State -> PublicIdentifier -> Maybe Result
 assetByPublicIdentifier st pubId = lookup pubId $ catMaybes $ map f $ M.elems $ assets st
-  where f (AssetRuntimeState (Completed res _) _ _) = Just (publicIdentifier res, res)
+  where f (AssetRuntimeState (Completed _) _ _ _ (Just res)) = Just (publicIdentifier res, res)
         f _ = Nothing
 
 
@@ -206,25 +208,47 @@ lookupAssetDefinition config h aId = case M.lookup aId (assetDefinitions config)
     Nothing -> autoDiscovery config h aId
 
 
+needsRebuild :: Handle -> AssetId -> ByteString -> IO Bool
+needsRebuild h aId fp = atomically $ do
+    s <- readTVar (state h)
+    case M.lookup aId (assets s) of
+        Just (AssetRuntimeState _ _ _ (Just sfp) _) -> return $ sfp /= fp
+        _ -> return True
+
+
 buildAsset :: Handle -> AssetId -> AssetDefinition -> IO ()
 buildAsset h aId ad = do
-    Builder src depSet cont _ <- createBuilder ad h aId
+    Builder src depSet cont fp <- createBuilder ad h aId
 
-    updateMetadata h aId src depSet
+    nr <- needsRebuild h aId fp
+    updateMetadata h aId src depSet fp
 
-    -- putStrLn $ "Waiting for " ++ show depSet
-    rd <- require h depSet
-    case rd of
-        Left e -> failBuild h aId e
-        Right resolvedDeps -> do
-            -- logger lock $ "Got all dependencies of " ++ show aId
-            -- logger lock $ resolvedDeps
-            case cont (M.map publicIdentifier resolvedDeps) of
+    if not nr
+        then do
+            logMessage h aId $ "Skipping build"
+
+            now <- getCurrentTime
+
+            let diff (Building t0) = diffUTCTime now t0
+                diff _             = fromIntegral (0 :: Int)
+
+            atomically $ do
+                modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Completed (diff $ arsState ars) }) aId (assets s) }
+
+        else do
+            -- putStrLn $ "Waiting for " ++ show depSet
+            rd <- require h depSet
+            case rd of
                 Left e -> failBuild h aId e
-                Right result1@(Result pub _) -> do
-                    let result = result1 { publicIdentifier = transformPublicIdentifier ad pub }
-                    -- logger lock $ "Pub: " ++ (publicIdentifier result)
-                    -- logger lock $ res
+                Right resolvedDeps -> do
+                    -- logger lock $ "Got all dependencies of " ++ show aId
+                    -- logger lock $ resolvedDeps
+                    case cont (M.map publicIdentifier resolvedDeps) of
+                        Left e -> failBuild h aId e
+                        Right result1@(Result pub _) -> do
+                            let result = result1 { publicIdentifier = transformPublicIdentifier ad pub }
+                            -- logger lock $ "Pub: " ++ (publicIdentifier result)
+                            -- logger lock $ res
 
-                    atomically $ writeTQueue (emitStream h) $ emitResult ad h aId result
-                    finishBuilding h aId result
+                            atomically $ writeTQueue (emitStream h) $ emitResult ad h aId result
+                            finishBuilding h aId result

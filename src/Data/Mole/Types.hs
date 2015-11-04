@@ -42,7 +42,10 @@ data AssetState
       -- to build the asset.
 
     | Failed Error
-    | Completed !Result !NominalDiffTime
+
+    | Completed !NominalDiffTime
+      -- ^ The asset is available. The time is how long it took to build it.
+
     deriving (Eq, Show)
 
 
@@ -85,6 +88,17 @@ data AssetRuntimeState = AssetRuntimeState
       -- ^ Assets which are depended on. These must be built before this asset
       -- can be further processed. Also, if any of the dependencies changes,
       -- this asset is rebuilt as well.
+
+    , arsSourceFingerprint :: Maybe ByteString
+      -- ^ This is used to avoid processing the file when its contents have
+      -- not changed.
+
+    , arsResult :: Maybe Result
+      -- ^ If the asset is built, this is the result. This can be set even
+      -- if the state is not 'Completed'. This is the case when the asset
+      -- is being rebuilt. If the state is not 'Completed' you should wait for
+      -- it to reach that state before using the result, otherwise you may
+      -- get a stale result.
     } deriving (Show)
 
 
