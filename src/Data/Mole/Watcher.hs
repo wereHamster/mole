@@ -33,7 +33,7 @@ attachFileWatcher h = do
                 let p = eventPath ev
                 rd <- reverseDependencies h cwd p
                 forM_ rd $ \aId -> do
-                    logMessage h aId $ "Rebuilding because " ++ p ++ " was modified"
+                    logMessage h aId $ "Dirty (" ++ p ++ ")"
                     markDirty h aId
 
             atomically $ modifyTVar (state h) (\s -> s { stopFileWatcher = stop })

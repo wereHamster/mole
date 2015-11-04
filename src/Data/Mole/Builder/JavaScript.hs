@@ -3,8 +3,6 @@
 module Data.Mole.Builder.JavaScript where
 
 
-import           Control.Monad
-
 import qualified Data.Set as S
 import qualified Data.Map as M
 import           Data.Map (Map)

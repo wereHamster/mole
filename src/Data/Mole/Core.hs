@@ -60,16 +60,30 @@ newHandle config = do
 
     let h = Handle st msgs e kH l
 
+
+    -- This background thread periodically checks if there are any assets
+    -- marked as dirty and forks a build thread for each.
     tId <- forkIO $ forever $ do
-        da <- dirtyAssets st
-        forM_ da $ \aId -> do
-            -- logger lock $ "Asset " ++ (show aId) ++ " is dirty. Building..."
+
+        -- Get a list of dirty assets. Those are the ones which we need to
+        -- rebuild. The check runs in a STM transaction, and will block until
+        -- at least one asset is dirty. Much efficient, wow.
+        dirtyAssetIds <- atomically $ do
+            s <- readTVar st
+            let assetIds = M.keys $ M.filter ((==) Dirty . arsState) (assets s)
+            if length assetIds == 0 then retry else return assetIds
+
+        forM_ dirtyAssetIds $ \aId -> do
+            -- First we have to mark the asset as being built. This is to avoid
+            -- forking two or more build threads for the same asset.
             markBuilding h aId
+
             forkIO $ do
                 assetDef <- lookupAssetDefinition config h aId
                 case assetDef of
-                    Nothing -> do -- failBuild h aId (AssetNotFound aId)
-                        logMessage h aId $ "Asset not found, treating as external!: " ++ show aId
+                    Nothing -> do
+                        -- failBuild h aId (AssetNotFound aId)
+                        logMessage h aId $ "Asset not found, treating as external: " ++ show aId
                         buildAsset h aId $ AssetDefinition (externalBuilder $ unAssetId aId) id (\_ _ _ -> return ())
                     Just ad -> do
                         -- logMessage h aId $ "Building"
@@ -85,15 +99,25 @@ logMessage h aId msg = do
     atomically $ writeTQueue (messages h) (Message now aId msg)
 
 
+adjustAssetRuntimeState :: Handle -> AssetId -> (AssetRuntimeState -> AssetRuntimeState) -> IO ()
+adjustAssetRuntimeState h aId f = atomically $ do
+    modifyTVar (state h) $ \s -> s { assets = M.adjust f aId (assets s) }
+
+insertAssetRuntimeStateWith :: Handle -> AssetId -> (AssetRuntimeState -> AssetRuntimeState -> AssetRuntimeState) -> AssetRuntimeState -> IO ()
+insertAssetRuntimeStateWith h aId f d = atomically $ do
+    modifyTVar (state h) $ \s -> s { assets = M.insertWith f aId d (assets s) }
+
+
 updateMetadata :: Handle -> AssetId -> Set FilePath -> Set AssetId -> ByteString -> IO ()
-updateMetadata h aId src ds fp = atomically $ do
-    modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars {
-        arsSources = src, arsDependencySet = ds, arsSourceFingerprint = Just fp }) aId (assets s) }
+updateMetadata h aId src ds fp = adjustAssetRuntimeState h aId $ \ars -> ars
+    { arsSources = src
+    , arsDependencySet = ds
+    , arsSourceFingerprint = Just fp
+    }
 
 
 buildIfNecessary :: Handle -> AssetId -> IO ()
-buildIfNecessary h aId = atomically $ do
-    modifyTVar (state h) $ \s -> s { assets = M.insertWith adj aId (AssetRuntimeState Dirty S.empty S.empty Nothing Nothing) (assets s) }
+buildIfNecessary h aId = insertAssetRuntimeStateWith h aId adj (assetRuntimeState Dirty)
   where
     adj _ ars = case arsState ars of
         Building _  -> ars
@@ -102,23 +126,20 @@ buildIfNecessary h aId = atomically $ do
 
 
 markDirty :: Handle -> AssetId -> IO ()
-markDirty h aId = atomically $ do
-    modifyTVar (state h) $ \s -> s { assets = M.insertWith (\_ ars -> ars { arsState = Dirty }) aId (AssetRuntimeState Dirty S.empty S.empty Nothing Nothing) (assets s) }
+markDirty h aId = insertAssetRuntimeStateWith h aId f (assetRuntimeState Dirty)
+  where f _ ars = ars { arsState = Dirty }
 
 
 markBuilding :: Handle -> AssetId -> IO ()
 markBuilding h aId = do
-    now <- getCurrentTime
-    atomically $ do
-        modifyTVar (state h) $ \s -> s { assets = M.insertWith (\_ ars -> ars { arsState = Building now }) aId (AssetRuntimeState (Building now) S.empty S.empty Nothing Nothing) (assets s) }
+    s <- Building <$> getCurrentTime
+    insertAssetRuntimeStateWith h aId (\_ ars -> ars { arsState = s }) (assetRuntimeState s)
 
 
 failBuild :: Handle -> AssetId -> Error -> IO ()
 failBuild h aId err = do
     logMessage h aId $ "Failure: " ++ show err
-    atomically $ do
-        modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Failed err }) aId (assets s) }
-
+    adjustAssetRuntimeState h aId $ \ars -> ars { arsState = Failed err }
     rebuildReverseDependencies h aId
 
 finishBuilding :: Handle -> AssetId -> Result -> IO ()
@@ -128,8 +149,10 @@ finishBuilding h aId res = do
     let diff (Building t0) = diffUTCTime now t0
         diff _             = fromIntegral (0 :: Int)
 
-    atomically $ do
-        modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Completed (diff $ arsState ars), arsResult = Just res }) aId (assets s) }
+    adjustAssetRuntimeState h aId $ \ars -> ars
+        { arsState = Completed (diff $ arsState ars)
+        , arsResult = Just res
+        }
 
     mbArs <- atomically $ do
         s <- readTVar (state h)
@@ -138,8 +161,7 @@ finishBuilding h aId res = do
     case mbArs of
         Nothing -> return ()
         Just ars -> case arsState ars of
-            Completed td ->
-                logMessage h aId $ "Build time: " ++ show td
+            Completed td -> logMessage h aId $ "Build time: " ++ show td
             _ -> return ()
 
 
@@ -151,6 +173,10 @@ isBuilding :: AssetState -> Bool
 isBuilding (Building _) = True
 isBuilding _            = False
 
+isFailed :: AssetState -> Bool
+isFailed (Failed _) = True
+isFailed _          = False
+
 rebuildReverseDependencies :: Handle -> AssetId -> IO ()
 rebuildReverseDependencies h aId = do
     s <- atomically $ readTVar (state h)
@@ -159,26 +185,35 @@ rebuildReverseDependencies h aId = do
             markDirty h aId'
 
 
+-- | Wait until the set of assets is built, and return the corresponding
+-- results. If any of the assets fails to build (for whatever reason), then
+-- immediately abort and return the reason.
 require :: Handle -> Set AssetId -> IO (Either Error (Map AssetId Result))
 require h assetIds = do
     -- Mark assets as dirty if they are not comleted yet.
-    forM_ (S.toList assetIds) $ \dep -> do
+    forM_ assetIds $ \dep -> do
         buildIfNecessary h dep
 
     -- Wait for the dependencies to have completed building.
     atomically $ do
         s <- readTVar (state h)
 
-        let de = filter (\(aId, _) -> S.member aId assetIds) (M.toList (assets s))
-        let completedPubRefs = catMaybes $ map (\(aId, ars) -> case (arsState ars, arsResult ars) of
-                (Completed _, Just res) -> Just (aId, res)
-                _ -> Nothing) de
+        -- All dependencies which are relevant.
+        let allDependencies = M.filterWithKey (\aId _ -> S.member aId assetIds) (assets s)
 
-        if length completedPubRefs == length assetIds
-            then return $ Right $ M.fromList completedPubRefs
-            else if any (\(_, ars) -> case arsState ars of Failed _ -> True; _ -> False) de
+        -- The dependencies which are completed and for which we have a result.
+        let completedDependencies = flip M.mapMaybe allDependencies $ \ars -> case (arsState ars, arsResult ars) of
+                (Completed _, Just res) -> Just res
+                _                       -> Nothing
+
+        -- A more accurate check would be 'assetIds == M.keysSet completedDependencies'.
+        -- Though comparing the length is probably faster.
+        if length completedDependencies == length assetIds
+            then return $ Right $ completedDependencies
+            else if any (isFailed . arsState) (M.elems allDependencies)
                 then return $ Left DependencyFailed
                 else retry
+
 
 assetsByPublicIdentifier :: State -> PublicIdentifier -> [(AssetId, Result)]
 assetsByPublicIdentifier st pubId = filter (\(_,res) -> publicIdentifier res == pubId) $
@@ -193,47 +228,42 @@ assetByPublicIdentifier st pubId = lookup pubId $ catMaybes $ map f $ M.elems $ 
 
 
 
-
-dirtyAssets :: TVar State -> IO [AssetId]
-dirtyAssets st = atomically $ do
-    s <- readTVar st
-    let de = filter (\(_, ars) -> Dirty == arsState ars) $ M.toList (assets s)
-    if length de == 0
-        then retry
-        else return $ map fst de
-
 lookupAssetDefinition :: Config -> Handle -> AssetId -> IO (Maybe AssetDefinition)
 lookupAssetDefinition config h aId = case M.lookup aId (assetDefinitions config) of
     Just ad -> return $ Just ad
     Nothing -> autoDiscovery config h aId
 
 
-needsRebuild :: Handle -> AssetId -> ByteString -> IO Bool
-needsRebuild h aId fp = atomically $ do
-    s <- readTVar (state h)
-    case M.lookup aId (assets s) of
-        Just (AssetRuntimeState _ _ _ (Just sfp) _) -> return $ sfp /= fp
-        _ -> return True
-
-
 buildAsset :: Handle -> AssetId -> AssetDefinition -> IO ()
 buildAsset h aId ad = do
     Builder src depSet cont fp <- createBuilder ad h aId
 
-    nr <- needsRebuild h aId fp
+    -- First check if we actually need to rebuild the asset. If the source
+    -- fingerprint is still the same then we can skip directly to 'Completed'.
+    needsRebuild <- atomically $ do
+        s <- readTVar (state h)
+        return $ case M.lookup aId (assets s) of
+            Just (AssetRuntimeState _ _ _ (Just sfp) (Just _)) -> sfp /= fp
+            _                                                  -> True
+
+    -- Eagerly update the metadata, even if we don't have to rebuild the asset.
+    -- When deciding whether to rebuild the asset or not, the only thing that
+    -- matters is the fingerprint. But the builder may have an updated or more
+    -- accurate set of dependencies now, and we do want to update that.
     updateMetadata h aId src depSet fp
 
-    if not nr
+
+    if not needsRebuild
         then do
-            logMessage h aId $ "Skipping build"
+            logMessage h aId $ "Skip"
 
             now <- getCurrentTime
 
             let diff (Building t0) = diffUTCTime now t0
                 diff _             = fromIntegral (0 :: Int)
 
-            atomically $ do
-                modifyTVar (state h) $ \s -> s { assets = M.adjust (\ars -> ars { arsState = Completed (diff $ arsState ars) }) aId (assets s) }
+            adjustAssetRuntimeState h aId $ \ars ->
+                ars { arsState = Completed (diff $ arsState ars) }
 
         else do
             -- putStrLn $ "Waiting for " ++ show depSet

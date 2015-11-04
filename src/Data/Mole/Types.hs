@@ -6,6 +6,7 @@ import           Control.Concurrent.STM
 import           Data.ByteString (ByteString)
 import           Data.Map (Map)
 import           Data.Set (Set)
+import qualified Data.Set as S
 import           Data.Time (UTCTime, NominalDiffTime)
 
 import qualified Network.Kraken as K
@@ -100,6 +101,18 @@ data AssetRuntimeState = AssetRuntimeState
       -- it to reach that state before using the result, otherwise you may
       -- get a stale result.
     } deriving (Show)
+
+
+-- | The initial, empty 'AssetRuntimeState', with the given 'AssetState'
+-- (usually 'Dirty' or 'Building' depending at which stage it is created).
+assetRuntimeState :: AssetState -> AssetRuntimeState
+assetRuntimeState s = AssetRuntimeState
+    { arsState             = s
+    , arsSources           = S.empty
+    , arsDependencySet     = S.empty
+    , arsSourceFingerprint = Nothing
+    , arsResult            = Nothing
+    }
 
 
 type PublicIdentifier = String
