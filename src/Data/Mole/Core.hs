@@ -13,6 +13,7 @@ import           Data.Set (Set)
 import qualified Data.Set as S
 
 import           Data.ByteString (ByteString)
+import qualified Data.Text as T
 
 import           Data.Maybe
 import           Data.Monoid
@@ -43,7 +44,7 @@ newHandle config = do
         (Message time aId msg) <- atomically $ readTQueue msgs
         putStrLn $ mconcat
             [ formatTime defaultTimeLocale "%H:%M:%S" time
-            , " [ " <> take 24 (padL 24 (unAssetId aId)) <> " ] "
+            , " [ " <> take 24 (padL 24 (T.unpack $ unAssetId aId)) <> " ] "
             , msg
             ]
         hFlush stdout
@@ -84,7 +85,7 @@ newHandle config = do
                     Nothing -> do
                         -- failBuild h aId (AssetNotFound aId)
                         logMessage h aId $ "Asset not found, treating as external: " ++ show aId
-                        buildAsset h aId $ AssetDefinition (externalBuilder $ unAssetId aId) id (\_ _ _ -> return ())
+                        buildAsset h aId $ AssetDefinition (externalBuilder $ T.unpack $ unAssetId aId) id (\_ _ _ -> return ())
                     Just ad -> do
                         -- logMessage h aId $ "Building"
                         buildAsset h aId ad

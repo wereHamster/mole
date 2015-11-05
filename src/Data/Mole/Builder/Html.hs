@@ -33,15 +33,15 @@ data Transformer = Transformer
     }
 
 extractSingleAsset :: String -> [AssetId]
-extractSingleAsset x = [AssetId x]
+extractSingleAsset x = [AssetId $ T.pack x]
 
 renderSingleAttribute :: Map AssetId String -> String -> Either Error String
 renderSingleAttribute m v =
-    case M.lookup (AssetId v) m of
+    case M.lookup (AssetId $ T.pack v) m of
         Just v' -> Right v'
-        Nothing -> case M.lookup (AssetId $ tail v) m of
+        Nothing -> case M.lookup (AssetId $ T.pack $ tail v) m of
             Just v'' -> Right v''
-            Nothing -> Left (UndeclaredDependency (AssetId v))
+            Nothing -> Left (UndeclaredDependency (AssetId $ T.pack v))
 
 extractStylesheetAssets :: String -> [AssetId]
 extractStylesheetAssets v =
@@ -56,7 +56,7 @@ renderStylesheetAssets m v = do
     let Right tokens = tokenize (T.pack v)
     newTokens <- forM tokens $ \t -> case t of
         (Url x) -> case M.lookup (urlAssetId (T.unpack x)) m of
-            Nothing -> Left (UndeclaredDependency (AssetId (T.unpack x)))
+            Nothing -> Left (UndeclaredDependency (AssetId x))
             Just v -> Right (Url $ T.pack $ reconstructUrl (T.unpack x) v)
         _ -> return t
 

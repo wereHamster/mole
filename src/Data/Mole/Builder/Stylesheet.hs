@@ -27,8 +27,8 @@ import           Network.URI
 
 urlAssetId :: String -> AssetId
 urlAssetId x = case parseRelativeReference x of
-    Nothing -> AssetId x
-    Just uri -> AssetId $ uriPath uri
+    Nothing -> AssetId $ T.pack x
+    Just uri -> AssetId $ T.pack $ uriPath uri
 
 reconstructUrl :: String -> String -> String
 reconstructUrl x pubId = case parseRelativeReference x of
@@ -58,7 +58,7 @@ stylesheetBuilder pubId src _ _ = do
     r tokens m = do
         newTokens <- forM tokens $ \t -> case t of
             (Url x) -> case M.lookup (urlAssetId (T.unpack x)) m of
-                Nothing -> Left (UndeclaredDependency (AssetId (T.unpack x)))
+                Nothing -> Left (UndeclaredDependency (AssetId x))
                 Just v -> Right (Url $ T.pack $ reconstructUrl (T.unpack x) v)
             _ -> return t
 

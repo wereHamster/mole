@@ -27,7 +27,7 @@ javascriptBuilder pubId src _ _ = do
     let t@(Template fragments) = template [("__assetUrl(\"", "\")")] body
     let deps = catMaybes $ (flip map) fragments $ \f -> case f of
                     (Lit _) -> Nothing
-                    (Var _ x) -> Just $ AssetId (T.unpack x)
+                    (Var _ x) -> Just $ AssetId x
 
     return $ Builder
         { assetSources      = S.singleton src
@@ -40,8 +40,8 @@ javascriptBuilder pubId src _ _ = do
     r :: Template -> Map AssetId String -> Either Error Result
     r t m = do
         body <- render t $ \(a,b) x -> do
-              case M.lookup (AssetId (T.unpack x)) m of
-                   Nothing -> Left (UndeclaredDependency (AssetId (T.unpack x)))
+              case M.lookup (AssetId x) m of
+                   Nothing -> Left (UndeclaredDependency (AssetId x))
                    Just v -> Right $ a <> T.pack v <> b
 
         let body' = T.encodeUtf8 body

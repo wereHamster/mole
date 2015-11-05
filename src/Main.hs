@@ -100,7 +100,7 @@ collectAssetDefinitions outputDir basePath = do
   where
     f m fi = if takeExtension p == ".html"
         then M.insert
-            (AssetId $ drop (length basePath + 1) $ p)
+            (AssetId $ T.pack $ drop (length basePath + 1) $ p)
             (AssetDefinition (builderForFile basePath p) transformPublicIdentifierDef (emitResultDef outputDir))
             m
         else m
@@ -126,15 +126,15 @@ locateSource opt (AssetId aId) = do
     f = do
         p <- filePath
         t <- fileType
-        return $ t == RegularFile && isSuffixOf aId p
+        return $ t == RegularFile && isSuffixOf (T.unpack aId) p
 
 
 defAutoDiscovery :: Options -> FilePath -> Handle -> AssetId -> IO (Maybe AssetDefinition)
 defAutoDiscovery opt outputDir _ (AssetId aId)
     | aId == "" = do
-        return $ Just $ AssetDefinition (externalBuilder aId) id (emitResultDef outputDir)
-    | isURI aId = do
-        return $ Just $ AssetDefinition (externalBuilder aId) id (emitResultDef outputDir)
+        return $ Just $ AssetDefinition (externalBuilder $ T.unpack aId) id (emitResultDef outputDir)
+    | isURI $ T.unpack aId = do
+        return $ Just $ AssetDefinition (externalBuilder $ T.unpack aId) id (emitResultDef outputDir)
     -- | head aId == '/' = do
         -- logMessage h (AssetId aId) $ "Starts with a slash, treating as external!"
         -- return $ Just $ AssetDefinition (externalBuilder aId) id (emitResultDef outputDir)
@@ -167,7 +167,7 @@ mkConfig opt outputDir = do
         return (aId, ad)
 
     let allAssets = M.fromList oAssets <> otherAssets
-    let allEntryPoints = filter (\(AssetId a) -> T.isSuffixOf ".html" (T.pack a)) $ M.keys allAssets
+    let allEntryPoints = filter (\(AssetId a) -> T.isSuffixOf ".html" a) $ M.keys allAssets
     -- print $ M.keys allAssets
 
     -- let otherAssets = M.fromList $ (flip map) (optEntryPoints opt) $ \(AssetId aId) ->
@@ -211,9 +211,7 @@ parseServe = Serve
     <*> option (Just <$> str) (long "socket-path" <> short 'u' <> metavar "SOCKET-PATH" <> value Nothing)
 
 assetIdRead :: ReadM AssetId
-assetIdRead = ReadM $ do
-    v <- ask
-    return $ AssetId v
+assetIdRead = ReadM $ AssetId . T.pack <$> ask
 
 data AssetType = Ext | Raw
 
@@ -226,11 +224,11 @@ assetRead at = ReadM $ do
 
   where
     ad aId p = case at of
-        Ext -> (AssetId aId, \_ _ -> return $ AssetDefinition (externalBuilder p) id (\_ _ _ -> return ()))
+        Ext -> (AssetId (T.pack aId), \_ _ -> return $ AssetDefinition (externalBuilder p) id (\_ _ _ -> return ()))
         Raw ->
-            ( AssetId aId
+            ( AssetId (T.pack aId)
             , \opt outputDir -> do
-                mbSource <- locateSource opt (AssetId aId)
+                mbSource <- locateSource opt (AssetId $ T.pack aId)
                 case mbSource of
                     Nothing -> error $ "Could not find asset " ++ aId
                     Just (_, p') -> do

@@ -8,6 +8,8 @@ import           Data.Map (Map)
 import           Data.Set (Set)
 import qualified Data.Set as S
 import           Data.Time (UTCTime, NominalDiffTime)
+import           Data.Text (Text)
+import qualified Data.Text as T
 
 import qualified Network.Kraken as K
 
@@ -19,11 +21,11 @@ import qualified Network.Kraken as K
 --
 -- Even though the 'AssetId' may look like a filename or path, it doesn't have
 -- to refer to an actual file in the filesystem.
-newtype AssetId = AssetId { unAssetId :: String }
+newtype AssetId = AssetId { unAssetId :: Text }
     deriving (Ord, Eq)
 
 instance Show AssetId where
-    show = unAssetId
+    show = T.unpack . unAssetId
 
 
 newtype BuildId = BuildId { unBuildId :: Int }
