@@ -22,9 +22,9 @@ type Context = Bracket -> Text -> Either Error Text
 data Fragment = Lit !Text | Var !Bracket !Text deriving (Show, Eq)
 newtype Template = Template [Fragment] deriving (Show, Eq)
 
-template :: Brackets -> String -> Template
-template brackets input = case AP.parseOnly (fragmentParser brackets) (T.pack input) of
-    Left  x -> error $ x ++ " on input '" ++ input ++ "'"
+template :: Brackets -> Text -> Template
+template brackets input = case AP.parseOnly (fragmentParser brackets) input of
+    Left  x -> error $ x ++ " on input '" ++ T.unpack input ++ "'"
     Right x -> Template $ mergeLiterals x
 
 mergeLiterals :: [Fragment] -> [Fragment]
@@ -70,10 +70,9 @@ fragmentParser brackets = go
                             return $ (x:xs, e)
 
 
-render :: Template -> Context -> Either Error String
-render (Template frags) ctxFunc = do
-    res <- traverse renderFrag frags
-    return $ T.unpack $ mconcat res
+render :: Template -> Context -> Either Error Text
+render (Template frags) ctxFunc =
+    mconcat <$> traverse renderFrag frags
   where
     renderFrag (Lit s) = pure s
     renderFrag (Var bracket x) = ctxFunc bracket x

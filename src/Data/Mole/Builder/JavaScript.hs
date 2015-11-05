@@ -11,6 +11,7 @@ import           Data.Maybe
 import           Data.Monoid
 
 import qualified Data.Text          as T
+import qualified Data.Text.IO       as T
 import qualified Data.Text.Encoding as T
 
 import           Data.Mole.Types
@@ -21,7 +22,7 @@ import           Data.Mole.Builder.Internal.Template
 
 javascriptBuilder :: String -> String -> Handle -> AssetId -> IO Builder
 javascriptBuilder pubId src _ _ = do
-    body <- readFile src
+    body <- T.readFile src
 
     let t@(Template fragments) = template [("__assetUrl(\"", "\")")] body
     let deps = catMaybes $ (flip map) fragments $ \f -> case f of
@@ -32,7 +33,7 @@ javascriptBuilder pubId src _ _ = do
         { assetSources      = S.singleton src
         , assetDependencies = S.fromList deps
         , packageAsset      = r t
-        , sourceFingerprint = T.encodeUtf8 $ T.pack body
+        , sourceFingerprint = T.encodeUtf8 body
         }
 
   where
@@ -43,5 +44,5 @@ javascriptBuilder pubId src _ _ = do
                    Nothing -> Left (UndeclaredDependency (AssetId (T.unpack x)))
                    Just v -> Right $ a <> T.pack v <> b
 
-        let body' = T.encodeUtf8 $ T.pack $ body
+        let body' = T.encodeUtf8 body
         return $ Result (fingerprint body' pubId) $ Just (body', "text/javascript")
