@@ -11,7 +11,7 @@ import           Data.Maybe
 import           Data.Monoid
 
 import qualified Data.Text          as T
-import           Data.ByteString.Char8 (pack)
+import qualified Data.Text.Encoding as T
 
 import           Data.Mole.Types
 import           Data.Mole.Builder.Internal.Fingerprint
@@ -32,7 +32,7 @@ javascriptBuilder pubId src _ _ = do
         { assetSources      = S.singleton src
         , assetDependencies = S.fromList deps
         , packageAsset      = r t
-        , sourceFingerprint = pack body
+        , sourceFingerprint = T.encodeUtf8 $ T.pack body
         }
 
   where
@@ -43,4 +43,5 @@ javascriptBuilder pubId src _ _ = do
                    Nothing -> Left (UndeclaredDependency (AssetId (T.unpack x)))
                    Just v -> Right $ a <> T.pack v <> b
 
-        return $ Result (fingerprint (pack body) pubId) $ Just (pack body, "text/javascript")
+        let body' = T.encodeUtf8 $ T.pack $ body
+        return $ Result (fingerprint body' pubId) $ Just (body', "text/javascript")
