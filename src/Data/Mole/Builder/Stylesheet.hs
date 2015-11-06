@@ -1,14 +1,12 @@
 module Data.Mole.Builder.Stylesheet where
 
 
-import           Control.Monad
+import           Data.Traversable
 
 import           Data.Map (Map)
 
 import qualified Data.Map as M
 import qualified Data.Set as S
-
-import           Data.ByteString.Char8 (pack)
 
 import           Data.Text (Text)
 import qualified Data.Text          as T
@@ -26,10 +24,16 @@ import           Network.URI
 
 
 
+tokenToAssetId :: Token -> Maybe AssetId
+tokenToAssetId (Url x) = Just $ urlAssetId x
+tokenToAssetId _       = Nothing
+
+
 urlAssetId :: Text -> AssetId
-urlAssetId x = case parseRelativeReference (T.unpack x) of
-    Nothing -> AssetId x
-    Just uri -> AssetId $ T.pack $ uriPath uri
+urlAssetId x = AssetId $ case parseRelativeReference (T.unpack x) of
+    Nothing  -> x
+    Just uri -> T.pack $ uriPath uri
+
 
 reconstructUrl :: Text -> Text -> Text
 reconstructUrl x pubId = case parseRelativeReference (T.unpack x) of
@@ -42,28 +46,23 @@ stylesheetBuilder src _ _ = do
     body <- T.readFile src
 
     let Right tokens = tokenize body
-    let deps = catMaybes $ (flip map) tokens $ \t ->
-            case t of
-                (Url x) -> Just $ urlAssetId x
-                _       -> Nothing
 
     return $ Builder
         { assetSources      = S.singleton src
-        , assetDependencies = S.fromList deps
-        , packageAsset      = r tokens
+        , assetDependencies = S.fromList (catMaybes $ map tokenToAssetId tokens)
+        , packageAsset      = render tokens
         , sourceFingerprint = T.encodeUtf8 body
         }
 
   where
-    r :: [Token] -> Map AssetId PublicIdentifier -> Either Error Result
-    r tokens m = do
-        newTokens <- forM tokens $ \t -> case t of
+    render :: [Token] -> Map AssetId PublicIdentifier -> Either Error Result
+    render tokens m = do
+        newTokens <- for tokens $ \t -> case t of
             (Url x) -> case M.lookup (urlAssetId x) m of
                 Nothing -> Left (UndeclaredDependency (AssetId x))
                 Just (PublicIdentifier v) -> Right (Url $ reconstructUrl x v)
-            _ -> return t
+            _ -> Right t
 
-        let bodyT = serialize newTokens
-        let body = T.unpack bodyT
+        let body = T.encodeUtf8 $ serialize newTokens
 
-        return $ Result (PublicIdentifier $ fingerprint (pack body) src) $ Just (T.encodeUtf8 bodyT, "text/css")
+        return $ Result (PublicIdentifier $ fingerprint body src) $ Just (body, "text/css")

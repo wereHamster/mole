@@ -66,7 +66,7 @@ renderStylesheetAssets m v = do
     newTokens <- forM tokens $ \t -> case t of
         (Url x) -> case M.lookup (urlAssetId x) m of
             Nothing -> Left (UndeclaredDependency (AssetId x))
-            Just (PublicIdentifier v) -> Right (Url $ reconstructUrl x v)
+            Just (PublicIdentifier pubId) -> Right (Url $ reconstructUrl x pubId)
         _ -> return t
 
     return $ serialize newTokens
@@ -81,6 +81,8 @@ tagTransformers =
     , Transformer (const True) "style"   extractStylesheetAssets renderStylesheetAssets
     ]
 
+-- | A tag may be associated with multiple transformers. That situation arises
+-- when we want to process multiple attributes of a particular tag.
 tagTransformersFor :: Text -> [Transformer]
 tagTransformersFor tag = filter (\t -> tagSelector t tag) tagTransformers
 
@@ -89,10 +91,11 @@ toInlineStyleDep :: [AssetId] -> [Tag Text] -> [AssetId]
 toInlineStyleDep acc [] = acc
 toInlineStyleDep acc ((TagOpen "style" _):(TagText text):(TagClose "style"):xs)
     = toInlineStyleDep (acc ++ extractStylesheetAssets text) xs
-toInlineStyleDep acc (x:xs) = toInlineStyleDep acc xs
+toInlineStyleDep acc (_:xs) = toInlineStyleDep acc xs
+
 
 renderInlineStyles :: Map AssetId PublicIdentifier -> [Tag Text] -> Either Error [Tag Text]
-renderInlineStyles m [] = return []
+renderInlineStyles _ [] = return []
 renderInlineStyles m ((TagOpen "style" attrs):(TagText text):(TagClose "style"):xs) = do
     text' <- renderStylesheetAssets m text
     rest  <- renderInlineStyles m xs
@@ -101,12 +104,35 @@ renderInlineStyles m (x:xs) = do
     xs' <- renderInlineStyles m xs
     return $ x:xs'
 
+
+tagDependencies :: Tag Text -> [AssetId]
+tagDependencies (TagOpen tag attrs) =
+    mconcat $ catMaybes $ map (\t -> depExtractor t <$> lookup (attributeName t) attrs)
+        (tagTransformersFor tag)
+tagDependencies _ = []
+
+
+insertResult :: Map AssetId PublicIdentifier -> Tag Text -> Either Error (Tag Text)
+insertResult m (TagOpen tag attrs) = TagOpen
+    <$> pure tag
+    <*> foldM (\a tf -> mapM (overrideAttr tf m) a) attrs (tagTransformersFor tag)
+insertResult _ t = pure t
+
+
+overrideAttr :: Transformer -> Map AssetId PublicIdentifier -> (Text,Text) -> Either Error (Text,Text)
+overrideAttr tf m (k,v)
+    | k == attributeName tf = attributeRenderer tf m v >>= \v' -> Right (k, v')
+    | otherwise = Right (k,v)
+
+
 htmlBuilder :: String -> String -> Handle -> AssetId -> IO Builder
 htmlBuilder pubId src _ _ = do
     body <- T.readFile src
+
     let tags = parseTags body
-    let deps = concatMap toDep tags
+    let deps = concatMap tagDependencies tags
     let inlineStyleDeps = toInlineStyleDep [] tags
+
     return $ Builder
         { assetSources      = S.singleton src
         , assetDependencies = S.fromList (deps ++ inlineStyleDeps)
@@ -115,34 +141,8 @@ htmlBuilder pubId src _ _ = do
         }
 
   where
-    toDep :: Tag Text -> [AssetId]
-    toDep (TagOpen tag attrs) =
-        concatMap (\t -> case lookup (attributeName t) attrs of
-            Nothing -> []
-            Just v ->  depExtractor t v
-        ) (tagTransformersFor tag)
-    toDep _ = []
-
     render :: [Tag Text] -> Map AssetId PublicIdentifier -> Either Error Result
     render tags m = do
-        t' <- forM tags $ \t -> do
-            insertResult m t
-
-        t'' <- renderInlineStyles m t'
-
-        let body = T.encodeUtf8 $ renderTags t''
+        body <- T.encodeUtf8 . renderTags <$>
+            (forM tags (insertResult m) >>= renderInlineStyles m)
         return $ Result (PublicIdentifier $ T.pack pubId) $ Just (body, "text/html")
-
-    insertResult :: Map AssetId PublicIdentifier -> Tag Text -> Either Error (Tag Text)
-    insertResult m t@(TagOpen tag attrs) = do
-        let tfs = tagTransformersFor tag
-        let f at tf = mapM (overrideAttr tf m) at
-
-        TagOpen <$> (pure tag) <*> foldM f attrs tfs
-
-    insertResult _ t = pure t
-
-    overrideAttr :: Transformer -> Map AssetId PublicIdentifier -> (Text,Text) -> Either Error (Text,Text)
-    overrideAttr tf m (k,v)
-        | k == attributeName tf = attributeRenderer tf m v >>= \v' -> Right (k, v')
-        | otherwise = Right (k,v)
