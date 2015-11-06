@@ -5,6 +5,7 @@ import           Control.Concurrent.STM
 
 import qualified Data.Set as S
 import qualified Data.ByteString as BS
+import qualified Data.Text as T
 import           Data.Maybe
 import           Data.Time
 import           Text.Printf
@@ -25,7 +26,7 @@ imageBuilder src contentType h aId = do
     originalBody <- BS.readFile src
     let fp = contentHash originalBody
     cacheDir <- lookupEnv "XDG_CACHE_DIR"
-    let cacheName = (fromMaybe ".cache" cacheDir) </> "kraken" </> fp
+    let cacheName = (fromMaybe ".cache" cacheDir) </> "kraken" </> T.unpack fp
     inCache <- fileExist cacheName
     body <- if inCache
         then do BS.readFile cacheName
@@ -66,7 +67,7 @@ imageBuilder src contentType h aId = do
     return $ Builder
         { assetSources      = S.singleton src
         , assetDependencies = S.empty
-        , packageAsset      = const $ Right $ Result (fingerprint body src) $ Just (body, contentType)
+        , packageAsset      = const $ Right $ Result (PublicIdentifier $ fingerprint body $ T.pack src) $ Just (body, contentType)
         , sourceFingerprint = originalBody
         }
 

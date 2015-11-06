@@ -108,8 +108,10 @@ collectAssetDefinitions outputDir basePath = do
 
 
 transformPublicIdentifierDef :: PublicIdentifier -> PublicIdentifier
-transformPublicIdentifierDef ('/':pubId) = '/' : pubId
-transformPublicIdentifierDef pubId       = '/' : pubId
+transformPublicIdentifierDef pubId = case T.uncons $ unPublicIdentifier pubId of
+    Nothing       -> pubId
+    Just ('/', _) -> pubId
+    _             -> PublicIdentifier $ T.cons '/' $ unPublicIdentifier pubId
 
 
 locateSource :: Options -> AssetId -> IO (Maybe (String, String))
@@ -132,9 +134,9 @@ locateSource opt (AssetId aId) = do
 defAutoDiscovery :: Options -> FilePath -> Handle -> AssetId -> IO (Maybe AssetDefinition)
 defAutoDiscovery opt outputDir _ (AssetId aId)
     | aId == "" = do
-        return $ Just $ AssetDefinition (externalBuilder $ T.unpack aId) id (emitResultDef outputDir)
+        return $ Just $ AssetDefinition (externalBuilder $ PublicIdentifier aId) id (emitResultDef outputDir)
     | isURI $ T.unpack aId = do
-        return $ Just $ AssetDefinition (externalBuilder $ T.unpack aId) id (emitResultDef outputDir)
+        return $ Just $ AssetDefinition (externalBuilder $ PublicIdentifier aId) id (emitResultDef outputDir)
     -- | head aId == '/' = do
         -- logMessage h (AssetId aId) $ "Starts with a slash, treating as external!"
         -- return $ Just $ AssetDefinition (externalBuilder aId) id (emitResultDef outputDir)
@@ -154,8 +156,8 @@ emitResultDef dist _ _ (Result pubId mbRes) = do
         Nothing -> return ()
         Just (body, _) -> when (dist /= "") $ do
             -- putStrLn $ "emit " ++ pubId
-            createDirectoryIfMissing True $ dist `joinDrive` (takeDirectory pubId)
-            BS.writeFile (dist `joinDrive` pubId) body
+            createDirectoryIfMissing True $ dist `joinDrive` (takeDirectory $ T.unpack $ unPublicIdentifier pubId)
+            BS.writeFile (dist `joinDrive` T.unpack (unPublicIdentifier pubId)) body
 
 
 mkConfig :: Options -> FilePath -> IO Config
@@ -219,7 +221,7 @@ assetRead :: AssetType -> ReadM (AssetId, Options -> String -> IO AssetDefinitio
 assetRead at = ReadM $ do
     v <- ask
     case map T.unpack $ T.splitOn "=" $ T.pack v of
-        [aId, p] -> return $ ad aId p
+        [aId, p] -> return $ ad aId $ PublicIdentifier $ T.pack p
         _ -> fail "ASSET=DEFINITION"
 
   where

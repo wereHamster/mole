@@ -37,12 +37,12 @@ javascriptBuilder pubId src _ _ = do
         }
 
   where
-    r :: Template -> Map AssetId String -> Either Error Result
+    r :: Template -> Map AssetId PublicIdentifier -> Either Error Result
     r t m = do
         body <- render t $ \(a,b) x -> do
               case M.lookup (AssetId x) m of
                    Nothing -> Left (UndeclaredDependency (AssetId x))
-                   Just v -> Right $ a <> T.pack v <> b
+                   Just (PublicIdentifier v) -> Right $ a <> v <> b
 
         let body' = T.encodeUtf8 body
-        return $ Result (fingerprint body' pubId) $ Just (body', "text/javascript")
+        return $ Result (PublicIdentifier $ fingerprint body' $ T.pack pubId) $ Just (body', "text/javascript")

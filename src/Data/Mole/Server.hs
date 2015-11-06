@@ -47,7 +47,7 @@ snapHandler h = do
     serve p = do
       s <- liftIO $ atomically $ readTVar (state h)
 
-      let asts = assetsByPublicIdentifier s (T.unpack $ T.decodeUtf8 p)
+      let asts = assetsByPublicIdentifier s (PublicIdentifier $ T.decodeUtf8 p)
     --   liftIO $ print asts
       if length asts == 0
           then pass

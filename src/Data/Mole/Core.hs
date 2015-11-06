@@ -85,7 +85,7 @@ newHandle config = do
                     Nothing -> do
                         -- failBuild h aId (AssetNotFound aId)
                         logMessage h aId $ "Asset not found, treating as external: " ++ show aId
-                        buildAsset h aId $ AssetDefinition (externalBuilder $ T.unpack $ unAssetId aId) id (\_ _ _ -> return ())
+                        buildAsset h aId $ AssetDefinition (externalBuilder $ PublicIdentifier $ unAssetId aId) id (\_ _ _ -> return ())
                     Just ad -> do
                         -- logMessage h aId $ "Building"
                         buildAsset h aId ad

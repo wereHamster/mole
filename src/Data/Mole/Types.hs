@@ -117,7 +117,12 @@ assetRuntimeState s = AssetRuntimeState
     }
 
 
-type PublicIdentifier = String
+-- | This is how one can refer to processed assets. Probably should be a newtype
+-- around 'URL', because that's what those really are (well, just the path part
+-- of an URL).
+newtype PublicIdentifier = PublicIdentifier { unPublicIdentifier :: Text }
+    deriving (Eq, Show)
+
 
 data Result = Result
     { publicIdentifier :: PublicIdentifier

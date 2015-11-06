@@ -2,9 +2,9 @@ module Data.Mole.Builder.External where
 
 
 import qualified Data.Set as S
+import qualified Data.Text.Encoding as T
 
 import           Data.Mole.Types
-import           Data.ByteString.Char8 (pack)
 
 
 
@@ -14,5 +14,5 @@ externalBuilder pubId _ _ = do
         { assetSources      = S.empty
         , assetDependencies = S.empty
         , packageAsset      = const $ Right $ Result pubId Nothing
-        , sourceFingerprint = pack pubId
+        , sourceFingerprint = T.encodeUtf8 $ unPublicIdentifier pubId
         }

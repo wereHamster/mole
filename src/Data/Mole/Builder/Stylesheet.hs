@@ -54,15 +54,15 @@ stylesheetBuilder pubId src _ _ = do
         }
 
   where
-    r :: [Token] -> Map AssetId String -> Either Error Result
+    r :: [Token] -> Map AssetId PublicIdentifier -> Either Error Result
     r tokens m = do
         newTokens <- forM tokens $ \t -> case t of
             (Url x) -> case M.lookup (urlAssetId (T.unpack x)) m of
                 Nothing -> Left (UndeclaredDependency (AssetId x))
-                Just v -> Right (Url $ T.pack $ reconstructUrl (T.unpack x) v)
+                Just (PublicIdentifier v) -> Right (Url $ T.pack $ reconstructUrl (T.unpack x) (T.unpack v))
             _ -> return t
 
         let bodyT = serialize newTokens
         let body = T.unpack bodyT
 
-        return $ Result (fingerprint (pack body) pubId) $ Just (T.encodeUtf8 bodyT, "text/css")
+        return $ Result (PublicIdentifier $ fingerprint (pack body) (T.pack pubId)) $ Just (T.encodeUtf8 bodyT, "text/css")

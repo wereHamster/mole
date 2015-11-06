@@ -29,18 +29,18 @@ data Transformer = Transformer
     { tagSelector       :: String -> Bool
     , attributeName     :: String
     , depExtractor      :: String -> [AssetId]
-    , attributeRenderer :: Map AssetId String -> String -> Either Error String
+    , attributeRenderer :: Map AssetId PublicIdentifier -> String -> Either Error String
     }
 
 extractSingleAsset :: String -> [AssetId]
 extractSingleAsset x = [AssetId $ T.pack x]
 
-renderSingleAttribute :: Map AssetId String -> String -> Either Error String
+renderSingleAttribute :: Map AssetId PublicIdentifier -> String -> Either Error String
 renderSingleAttribute m v =
     case M.lookup (AssetId $ T.pack v) m of
-        Just v' -> Right v'
+        Just (PublicIdentifier v') -> Right $ T.unpack v'
         Nothing -> case M.lookup (AssetId $ T.pack $ tail v) m of
-            Just v'' -> Right v''
+            Just (PublicIdentifier v'') -> Right $ T.unpack v''
             Nothing -> Left (UndeclaredDependency (AssetId $ T.pack v))
 
 extractStylesheetAssets :: String -> [AssetId]
@@ -51,13 +51,13 @@ extractStylesheetAssets v =
                 (Url x) -> Just $ urlAssetId (T.unpack x)
                 _       -> Nothing
 
-renderStylesheetAssets :: Map AssetId String -> String -> Either Error String
+renderStylesheetAssets :: Map AssetId PublicIdentifier -> String -> Either Error String
 renderStylesheetAssets m v = do
     let Right tokens = tokenize (T.pack v)
     newTokens <- forM tokens $ \t -> case t of
         (Url x) -> case M.lookup (urlAssetId (T.unpack x)) m of
             Nothing -> Left (UndeclaredDependency (AssetId x))
-            Just v -> Right (Url $ T.pack $ reconstructUrl (T.unpack x) v)
+            Just (PublicIdentifier v) -> Right (Url $ T.pack $ reconstructUrl (T.unpack x) (T.unpack v))
         _ -> return t
 
     return $ T.unpack $ serialize newTokens
@@ -82,7 +82,7 @@ toInlineStyleDep acc ((TagOpen "style" _):(TagText text):(TagClose "style"):xs)
     = toInlineStyleDep (acc ++ extractStylesheetAssets text) xs
 toInlineStyleDep acc (x:xs) = toInlineStyleDep acc xs
 
-renderInlineStyles :: Map AssetId String -> [Tag String] -> Either Error [Tag String]
+renderInlineStyles :: Map AssetId PublicIdentifier -> [Tag String] -> Either Error [Tag String]
 renderInlineStyles m [] = return []
 renderInlineStyles m ((TagOpen "style" attrs):(TagText text):(TagClose "style"):xs) = do
     text' <- renderStylesheetAssets m text
@@ -98,7 +98,12 @@ htmlBuilder pubId src _ _ = do
     let tags = parseTags body
     let deps = concatMap toDep tags
     let inlineStyleDeps = toInlineStyleDep [] tags
-    return $ Builder (S.singleton src) (S.fromList (deps ++ inlineStyleDeps)) (render tags) (pack body)
+    return $ Builder
+        { assetSources      = S.singleton src
+        , assetDependencies = S.fromList (deps ++ inlineStyleDeps)
+        , packageAsset      = render tags
+        , sourceFingerprint = pack body
+        }
 
   where
     toDep :: Tag String -> [AssetId]
@@ -109,7 +114,7 @@ htmlBuilder pubId src _ _ = do
         ) (tagTransformersFor tag)
     toDep _ = []
 
-    render :: [Tag String] -> Map AssetId String -> Either Error Result
+    render :: [Tag String] -> Map AssetId PublicIdentifier -> Either Error Result
     render tags m = do
         t' <- forM tags $ \t -> do
             insertResult m t
@@ -117,9 +122,9 @@ htmlBuilder pubId src _ _ = do
         t'' <- renderInlineStyles m t'
 
         let body = T.encodeUtf8 $ T.pack $ renderTags t''
-        return $ Result pubId $ Just (body, "text/html")
+        return $ Result (PublicIdentifier $ T.pack pubId) $ Just (body, "text/html")
 
-    insertResult :: Map AssetId String -> Tag String -> Either Error (Tag String)
+    insertResult :: Map AssetId PublicIdentifier -> Tag String -> Either Error (Tag String)
     insertResult m t@(TagOpen tag attrs) = do
         let tfs = tagTransformersFor tag
         let f at tf = mapM (overrideAttr tf m) at
@@ -128,7 +133,7 @@ htmlBuilder pubId src _ _ = do
 
     insertResult _ t = pure t
 
-    overrideAttr :: Transformer -> Map AssetId String -> (String,String) -> Either Error (String,String)
+    overrideAttr :: Transformer -> Map AssetId PublicIdentifier -> (String,String) -> Either Error (String,String)
     overrideAttr tf m (k,v)
         | k == attributeName tf = attributeRenderer tf m v >>= \v' -> Right (k, v')
         | otherwise = Right (k,v)

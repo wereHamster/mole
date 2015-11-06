@@ -4,6 +4,7 @@ module Data.Mole.Builder.Binary where
 import qualified Data.Set as S
 
 import qualified Data.ByteString as BS
+import qualified Data.Text as T
 
 import           Data.Mole.Types
 import           Data.Mole.Builder.Internal.Fingerprint
@@ -16,7 +17,7 @@ binaryBuilder src contentType _ _ = do
     return $ Builder
         { assetSources      = S.singleton src
         , assetDependencies = S.empty
-        , packageAsset      = const $ Right $ Result (fingerprint body src) $ Just (body, contentType)
+        , packageAsset      = const $ Right $ Result (PublicIdentifier $ fingerprint body $ T.pack src) $ Just (body, contentType)
         , sourceFingerprint = body
         }
 

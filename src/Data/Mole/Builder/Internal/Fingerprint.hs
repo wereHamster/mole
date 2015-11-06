@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Data.Mole.Builder.Internal.Fingerprint
     ( contentHash
     , fingerprint
@@ -6,8 +8,10 @@ module Data.Mole.Builder.Internal.Fingerprint
 
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
-import           Data.ByteString.Char8 (unpack)
 import           Data.Word
+import           Data.Text (Text)
+import qualified Data.Text          as T
+import qualified Data.Text.Encoding as T
 
 import           Crypto.Hash.SHA3
 
@@ -15,8 +19,8 @@ import           System.FilePath
 
 
 
-contentHash :: ByteString -> String
-contentHash body =  unpack $ BS.map (\x -> alnum $ rem x 62) $ hash 512 body
+contentHash :: ByteString -> Text
+contentHash body = T.decodeUtf8 $ BS.map (\x -> alnum $ rem x 62) $ hash 512 body
   where
     alnum :: Word8 -> Word8
     alnum x
@@ -26,14 +30,14 @@ contentHash body =  unpack $ BS.map (\x -> alnum $ rem x 62) $ hash 512 body
         | otherwise = error $ "Out of range: " ++ show x
 
 
-fingerprint :: ByteString -> String -> String
+fingerprint :: ByteString -> Text -> Text
 fingerprint body name = mconcat
-    [ take prefixLength h
+    [ T.take prefixLength h
     , "-"
-    , takeBaseName name
+    , T.pack (takeBaseName $ T.unpack name)
     , "-"
-    , drop prefixLength h
-    , takeExtension name
+    , T.drop prefixLength h
+    , T.pack (takeExtension $ T.unpack name)
     ]
   where
     h = contentHash body
