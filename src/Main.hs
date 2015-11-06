@@ -5,6 +5,7 @@ module Main where
 import           Control.Concurrent.STM
 import           Control.Monad
 import           Control.Monad.Reader
+import           Control.Monad.Trans.Except
 import           Control.Applicative
 
 import           Data.Map (Map)
@@ -14,6 +15,7 @@ import qualified Data.Set as S
 
 import qualified Data.ByteString as BS
 
+import           Data.Text (Text)
 import qualified Data.Text as T
 
 import           Data.Monoid
@@ -212,27 +214,30 @@ parseServe = Serve
     <$> option auto (long "port" <> short 'p' <> metavar "PORT" <> value 8000)
     <*> option (Just <$> str) (long "socket-path" <> short 'u' <> metavar "SOCKET-PATH" <> value Nothing)
 
+askText :: ReaderT String (Except ParseError) Text
+askText = T.pack <$> ask
+
 assetIdRead :: ReadM AssetId
-assetIdRead = ReadM $ AssetId . T.pack <$> ask
+assetIdRead = ReadM $ AssetId <$> askText
 
 data AssetType = Ext | Raw
 
 assetRead :: AssetType -> ReadM (AssetId, Options -> String -> IO AssetDefinition)
 assetRead at = ReadM $ do
-    v <- ask
-    case map T.unpack $ T.splitOn "=" $ T.pack v of
-        [aId, p] -> return $ ad aId $ PublicIdentifier $ T.pack p
+    v <- askText
+    case T.splitOn "=" v of
+        [aId, p] -> return $ ad aId $ PublicIdentifier p
         _ -> fail "ASSET=DEFINITION"
 
   where
     ad aId p = case at of
-        Ext -> (AssetId (T.pack aId), \_ _ -> return $ AssetDefinition (externalBuilder p) id (\_ _ _ -> return ()))
+        Ext -> (AssetId aId, \_ _ -> return $ AssetDefinition (externalBuilder p) id (\_ _ _ -> return ()))
         Raw ->
-            ( AssetId (T.pack aId)
+            ( AssetId aId
             , \opt outputDir -> do
-                mbSource <- locateSource opt (AssetId $ T.pack aId)
+                mbSource <- locateSource opt (AssetId aId)
                 case mbSource of
-                    Nothing -> error $ "Could not find asset " ++ aId
+                    Nothing -> error $ "Could not find asset " ++ T.unpack aId
                     Just (_, p') -> do
                         return $ AssetDefinition (rawBuilder p p' "application/octet-stream") transformPublicIdentifierDef (emitResultDef outputDir)
             )
@@ -252,8 +257,8 @@ parsePaths = option pathRead
     ( long "paths" <> short 'p' <> metavar "SEARCH:PATH:DIRS:..."<> value ["assets/"] )
   where
     pathRead = ReadM $ do
-        v <- ask
-        case map T.unpack $ T.splitOn ":" $ T.pack v of
+        v <- askText
+        case map T.unpack $ T.splitOn ":" v of
             (x:xs) -> return $ x:xs
             _ -> fail "SEARCH:PATH:DIRS:..."
 

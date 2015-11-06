@@ -67,7 +67,7 @@ imageBuilder src contentType h aId = do
     return $ Builder
         { assetSources      = S.singleton src
         , assetDependencies = S.empty
-        , packageAsset      = const $ Right $ Result (PublicIdentifier $ fingerprint body $ T.pack src) $ Just (body, contentType)
+        , packageAsset      = const $ Right $ Result (PublicIdentifier $ fingerprint body src) $ Just (body, contentType)
         , sourceFingerprint = originalBody
         }
 

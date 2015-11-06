@@ -10,7 +10,6 @@ import           Data.Map (Map)
 import           Data.Maybe
 import           Data.Monoid
 
-import qualified Data.Text          as T
 import qualified Data.Text.IO       as T
 import qualified Data.Text.Encoding as T
 
@@ -20,8 +19,8 @@ import           Data.Mole.Builder.Internal.Template
 
 
 
-javascriptBuilder :: String -> String -> Handle -> AssetId -> IO Builder
-javascriptBuilder pubId src _ _ = do
+javascriptBuilder :: String -> Handle -> AssetId -> IO Builder
+javascriptBuilder src _ _ = do
     body <- T.readFile src
 
     let t@(Template fragments) = template [("__assetUrl(\"", "\")")] body
@@ -45,4 +44,4 @@ javascriptBuilder pubId src _ _ = do
                    Just (PublicIdentifier v) -> Right $ a <> v <> b
 
         let body' = T.encodeUtf8 body
-        return $ Result (PublicIdentifier $ fingerprint body' $ T.pack pubId) $ Just (body', "text/javascript")
+        return $ Result (PublicIdentifier $ fingerprint body' src) $ Just (body', "text/javascript")

@@ -1,4 +1,5 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Main where
 
@@ -24,6 +25,9 @@ import           Data.Time.Clock.POSIX
 import           Data.Mole.Builder.Internal.Template
 
 
+instance Serial IO Text where
+    series = T.pack <$> series
+
 
 main :: IO ()
 main = do
@@ -39,8 +43,8 @@ spec :: Spec
 spec = do
     describe "Data.Mole.Builder.Internal.Template" $ do
         it "should parse a non-empty string into a single literal" $ do
-            property $ \x -> length x > 0 ==>
-                template brackets x == Template [Lit $ T.pack x]
+            property $ \x -> T.length x > 0 ==>
+                template brackets x == Template [Lit x]
         it "should strip whitespace around a var" $ do
             template brackets "<* \nvar \t *>" `shouldBe`
                 Template [ Var bracket "var" ]

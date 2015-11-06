@@ -14,9 +14,9 @@ import           System.FilePath
 
 builderForFile :: FilePath -> String -> Handle -> AssetId -> IO Builder
 builderForFile basePath x = case takeExtension x of
-    ".css"  -> stylesheetBuilder x x
+    ".css"  -> stylesheetBuilder x
     ".html" -> htmlBuilder (drop (length basePath) x) x
-    ".js"   -> javascriptBuilder (drop (length basePath) x) x
+    ".js"   -> javascriptBuilder x
     ".png"  -> imageBuilder x "image/png"
     ".jpeg" -> imageBuilder x "image/jpeg"
     ".jpg"  -> imageBuilder x "image/jpeg"

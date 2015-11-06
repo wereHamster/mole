@@ -10,6 +10,7 @@ import qualified Data.Set as S
 
 import           Data.ByteString.Char8 (pack)
 
+import           Data.Text (Text)
 import qualified Data.Text          as T
 import qualified Data.Text.Encoding as T
 import qualified Data.Text.IO       as T
@@ -25,25 +26,25 @@ import           Network.URI
 
 
 
-urlAssetId :: String -> AssetId
-urlAssetId x = case parseRelativeReference x of
-    Nothing -> AssetId $ T.pack x
+urlAssetId :: Text -> AssetId
+urlAssetId x = case parseRelativeReference (T.unpack x) of
+    Nothing -> AssetId x
     Just uri -> AssetId $ T.pack $ uriPath uri
 
-reconstructUrl :: String -> String -> String
-reconstructUrl x pubId = case parseRelativeReference x of
+reconstructUrl :: Text -> Text -> Text
+reconstructUrl x pubId = case parseRelativeReference (T.unpack x) of
     Nothing -> pubId
-    Just uri -> show $ uri { uriPath = pubId }
+    Just uri -> T.pack $ show $ uri { uriPath = T.unpack pubId }
 
 
-stylesheetBuilder :: String -> String -> Handle -> AssetId -> IO Builder
-stylesheetBuilder pubId src _ _ = do
+stylesheetBuilder :: String -> Handle -> AssetId -> IO Builder
+stylesheetBuilder src _ _ = do
     body <- T.readFile src
 
     let Right tokens = tokenize body
     let deps = catMaybes $ (flip map) tokens $ \t ->
             case t of
-                (Url x) -> Just $ urlAssetId (T.unpack x)
+                (Url x) -> Just $ urlAssetId x
                 _       -> Nothing
 
     return $ Builder
@@ -57,12 +58,12 @@ stylesheetBuilder pubId src _ _ = do
     r :: [Token] -> Map AssetId PublicIdentifier -> Either Error Result
     r tokens m = do
         newTokens <- forM tokens $ \t -> case t of
-            (Url x) -> case M.lookup (urlAssetId (T.unpack x)) m of
+            (Url x) -> case M.lookup (urlAssetId x) m of
                 Nothing -> Left (UndeclaredDependency (AssetId x))
-                Just (PublicIdentifier v) -> Right (Url $ T.pack $ reconstructUrl (T.unpack x) (T.unpack v))
+                Just (PublicIdentifier v) -> Right (Url $ reconstructUrl x v)
             _ -> return t
 
         let bodyT = serialize newTokens
         let body = T.unpack bodyT
 
-        return $ Result (PublicIdentifier $ fingerprint (pack body) (T.pack pubId)) $ Just (T.encodeUtf8 bodyT, "text/css")
+        return $ Result (PublicIdentifier $ fingerprint (pack body) src) $ Just (T.encodeUtf8 bodyT, "text/css")

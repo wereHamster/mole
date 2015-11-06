@@ -30,14 +30,14 @@ contentHash body = T.decodeUtf8 $ BS.map (\x -> alnum $ rem x 62) $ hash 512 bod
         | otherwise = error $ "Out of range: " ++ show x
 
 
-fingerprint :: ByteString -> Text -> Text
+fingerprint :: ByteString -> String -> Text
 fingerprint body name = mconcat
     [ T.take prefixLength h
     , "-"
-    , T.pack (takeBaseName $ T.unpack name)
+    , T.pack (takeBaseName name)
     , "-"
     , T.drop prefixLength h
-    , T.pack (takeExtension $ T.unpack name)
+    , T.pack (takeExtension name)
     ]
   where
     h = contentHash body
