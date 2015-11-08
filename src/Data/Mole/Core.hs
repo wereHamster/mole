@@ -109,11 +109,11 @@ insertAssetRuntimeStateWith h aId f d = atomically $ do
     modifyTVar (state h) $ \s -> s { assets = M.insertWith f aId d (assets s) }
 
 
-updateMetadata :: Handle -> AssetId -> Set FilePath -> Set AssetId -> ByteString -> IO ()
-updateMetadata h aId src ds fp = adjustAssetRuntimeState h aId $ \ars -> ars
+updateMetadata :: Handle -> AssetId -> Set FilePath -> Set AssetId -> ByteString -> Map AssetId PublicIdentifier -> IO ()
+updateMetadata h aId src ds fp rd = adjustAssetRuntimeState h aId $ \ars -> ars
     { arsSources = src
     , arsDependencySet = ds
-    , arsSourceFingerprint = Just fp
+    , arsSource = Just (fp, rd)
     }
 
 
@@ -239,39 +239,41 @@ buildAsset :: Handle -> AssetId -> AssetDefinition -> IO ()
 buildAsset h aId ad = do
     Builder src depSet cont fp <- createBuilder ad h aId
 
-    -- First check if we actually need to rebuild the asset. If the source
-    -- fingerprint is still the same then we can skip directly to 'Completed'.
-    needsRebuild <- atomically $ do
-        s <- readTVar (state h)
-        return $ case M.lookup aId (assets s) of
-            Just (AssetRuntimeState _ _ _ (Just sfp) (Just _)) -> sfp /= fp
-            _                                                  -> True
+    eitherResolvedDeps <- require h depSet
+    case eitherResolvedDeps of
+        Left e -> failBuild h aId e
 
-    -- Eagerly update the metadata, even if we don't have to rebuild the asset.
-    -- When deciding whether to rebuild the asset or not, the only thing that
-    -- matters is the fingerprint. But the builder may have an updated or more
-    -- accurate set of dependencies now, and we do want to update that.
-    updateMetadata h aId src depSet fp
+        Right resolvedDeps -> do
+            let sourceDeps = M.map publicIdentifier resolvedDeps
+
+            -- First check if we actually need to rebuild the asset. If the source
+            -- fingerprint is still the same then we can skip directly to 'Completed'.
+            needsRebuild <- atomically $ do
+                s <- readTVar (state h)
+                return $ case M.lookup aId (assets s) of
+                    Just (AssetRuntimeState _ _ _ (Just (sfp, srd)) (Just _)) -> sfp /= fp || sourceDeps /= srd
+                    _                                                         -> True
+
+            -- Eagerly update the metadata, even if we don't have to rebuild the asset.
+            -- When deciding whether to rebuild the asset or not, the only thing that
+            -- matters is the fingerprint. But the builder may have an updated or more
+            -- accurate set of dependencies now, and we do want to update that.
+            updateMetadata h aId src depSet fp sourceDeps
 
 
-    if not needsRebuild
-        then do
-            logMessage h aId $ "Skip"
+            if not needsRebuild
+                then do
+                    logMessage h aId $ "Skip"
 
-            now <- getCurrentTime
+                    now <- getCurrentTime
 
-            let diff (Building t0) = diffUTCTime now t0
-                diff _             = fromIntegral (0 :: Int)
+                    let diff (Building t0) = diffUTCTime now t0
+                        diff _             = fromIntegral (0 :: Int)
 
-            adjustAssetRuntimeState h aId $ \ars ->
-                ars { arsState = Completed (diff $ arsState ars) }
+                    adjustAssetRuntimeState h aId $ \ars ->
+                        ars { arsState = Completed (diff $ arsState ars) }
 
-        else do
-            -- putStrLn $ "Waiting for " ++ show depSet
-            rd <- require h depSet
-            case rd of
-                Left e -> failBuild h aId e
-                Right resolvedDeps -> do
+                else do
                     -- logger lock $ "Got all dependencies of " ++ show aId
                     -- logger lock $ resolvedDeps
                     case cont (M.map publicIdentifier resolvedDeps) of

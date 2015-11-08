@@ -92,9 +92,11 @@ data AssetRuntimeState = AssetRuntimeState
       -- can be further processed. Also, if any of the dependencies changes,
       -- this asset is rebuilt as well.
 
-    , arsSourceFingerprint :: Maybe ByteString
+    , arsSource :: Maybe (ByteString, Map AssetId PublicIdentifier)
       -- ^ This is used to avoid processing the file when its contents have
-      -- not changed.
+      -- not changed. The first element of the tuple is the file contents or
+      -- fingerprint (hash), the second element are the resolved dependencies.
+      -- If the two are same, then the result SHOULD as well.
 
     , arsResult :: Maybe Result
       -- ^ If the asset is built, this is the result. This can be set even
@@ -109,11 +111,11 @@ data AssetRuntimeState = AssetRuntimeState
 -- (usually 'Dirty' or 'Building' depending at which stage it is created).
 assetRuntimeState :: AssetState -> AssetRuntimeState
 assetRuntimeState s = AssetRuntimeState
-    { arsState             = s
-    , arsSources           = S.empty
-    , arsDependencySet     = S.empty
-    , arsSourceFingerprint = Nothing
-    , arsResult            = Nothing
+    { arsState         = s
+    , arsSources       = S.empty
+    , arsDependencySet = S.empty
+    , arsSource        = Nothing
+    , arsResult        = Nothing
     }
 
 
