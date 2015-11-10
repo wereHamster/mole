@@ -14,7 +14,7 @@ import           Data.Monoid
 import           Data.Maybe
 import           Data.List (find)
 
-import           Snap.Http.Server (simpleHttpServe, ConfigLog(..))
+import           Snap.Http.Server (httpServe, ConfigLog(..))
 import qualified Snap.Http.Server.Config as SC
 import           Snap (Snap, pass, getRequest, rqPathInfo, setContentType, modifyResponse, writeBS)
 
@@ -28,9 +28,9 @@ serveFiles h port mbSocketPath = do
     snapConfig <- do
         config <- return SC.emptyConfig :: IO (SC.Config Snap ())
         let config' = SC.setAccessLog ConfigNoLog $ SC.setErrorLog ConfigNoLog config
-        return $ maybe config' (\x -> SC.setUnixSocket x config') mbSocketPath
+        return $ maybe (SC.setPort port config') (\x -> SC.setUnixSocket x config') mbSocketPath
 
-    simpleHttpServe (SC.setPort port snapConfig) (snapHandler h)
+    httpServe snapConfig (snapHandler h)
 
 
 
