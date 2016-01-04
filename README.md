@@ -87,10 +87,15 @@ these tools slow.
 
 For these cases Mole supports a different syntax that is completely transparent
 to the JavaScript language and thus your toolchain:
-`let imageUrl = "<* images/kitten.png *>";`. It's a plain JavaScript string, but
-with special brackets so that it can be detected by Mole. The brackets are chosen
+`let imageUrl = __assetUrl("images/kitten.png");`. It's a plain JavaScript string, but
+wrapped with a function call so that it can be detected by Mole. The function name is chosen
 to be unlikely to clash with any existing uses. It's very fast to
-detect these brackets in a source file, and that keeps processing time low.
+detect these fragments in a source file, and that keeps processing time low.
+
+Mole does not remove the function call, you need to define that function somewhere in your project.
+If you structure your project well, you can make it so that it works with and without mole in
+the toolchain. That way you really can treat mole purely as an optimization step.
+
 
 ### Optimizations
 
