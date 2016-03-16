@@ -1,27 +1,28 @@
-resolver: nightly-2015-10-27
+resolver: nightly-2016-03-15
 
 packages:
 - '.'
 - location:
-    git: git@github.com:snapframework/snap-core.git
-    commit: b5ca1f086f8cd49a8f139e2547d597a87ddc3ef1
+    git: https://github.com/snapframework/snap-core.git
+    commit: 3f7bee971c0c338886bd52235c85bc087f856ae5
   extra-dep: true
 - location:
-    git: git@github.com:snapframework/snap-server.git
-    commit: d84500c262b9125e5f673e1db517ce54ae5fab93
+    git: https://github.com/snapframework/snap-server.git
+    commit: f2c4ced4f3414a3a2e7eaf422c5002a8decb2512
   extra-dep: true
 - location:
-    git: git@github.com:snapframework/io-streams-haproxy.git
+    git: https://github.com/snapframework/io-streams-haproxy.git
     commit: ab208d49fe73c9cf05e46c0d929eec311fb0cfd9
   extra-dep: true
 - location:
-    git: git@github.com:snapframework/snap.git
-    commit: da847284b0da2abb66051c6e1084f5f9e0c720f0
+    git: https://github.com/snapframework/snap.git
+    commit: 5dc684771ce091b2abe22a52377ecf077051b7eb
   extra-dep: true
 - location:
-    git: git@github.com:snapframework/heist.git
-    commit: 2743031c4d92ba08cf4e3e3cf960807b5158c6f3
+    git: https://github.com/snapframework/heist.git
+    commit: 377c22d128c821f612b438d15c376608cd5f87ae
   extra-dep: true
 
 extra-deps:
 - readable-0.3.1
+- clock-0.5.0.1
