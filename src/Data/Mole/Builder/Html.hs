@@ -75,6 +75,7 @@ tagTransformers :: [Transformer]
 tagTransformers =
     [ Transformer ("link"==)   "href"    extractSingleAsset renderSingleAttribute
     , Transformer ("img"==)    "src"     extractSingleAsset renderSingleAttribute
+    , Transformer ("source"==) "srcset"  extractSingleAsset renderSingleAttribute
     , Transformer ("script"==) "src"     extractSingleAsset renderSingleAttribute
     , Transformer ("a"==)      "href"    extractSingleAsset renderSingleAttribute
     , Transformer ("meta"==)   "content" extractSingleAsset renderSingleAttribute
