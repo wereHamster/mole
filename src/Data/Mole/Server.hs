@@ -16,7 +16,7 @@ import           Data.List (find)
 
 import           Snap.Http.Server (httpServe, ConfigLog(..))
 import qualified Snap.Http.Server.Config as SC
-import           Snap (Snap, pass, getRequest, rqPathInfo, setContentType, modifyResponse, writeBS)
+import           Snap.Core (Snap, pass, getRequest, rqPathInfo, setContentType, modifyResponse, writeBS)
 
 import           Data.Mole.Types
 import           Data.Mole.Core

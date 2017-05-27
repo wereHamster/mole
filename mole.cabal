@@ -61,7 +61,7 @@ executable mole
      , filemanip
      , fsnotify >=0.2
      , directory
-     , snap
+     , snap-core
      , snap-server
      , text
      , transformers
