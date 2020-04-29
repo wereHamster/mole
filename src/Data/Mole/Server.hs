@@ -10,7 +10,6 @@ import           Control.Applicative
 import qualified Data.Text          as T
 import qualified Data.Text.Encoding as T
 
-import           Data.Monoid
 import           Data.Maybe
 import           Data.List (find)
 

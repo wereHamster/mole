@@ -54,7 +54,7 @@ renderSingleAttribute m v =
 
 extractStylesheetAssets :: Text -> [AssetId]
 extractStylesheetAssets v =
-    let Right tokens = tokenize v
+    let tokens = tokenize v
     in catMaybes $ (flip map) tokens $ \t ->
             case t of
                 (Url x) -> Just $ urlAssetId x
@@ -62,7 +62,7 @@ extractStylesheetAssets v =
 
 renderStylesheetAssets :: Map AssetId PublicIdentifier -> Text -> Either Error Text
 renderStylesheetAssets m v = do
-    let Right tokens = tokenize v
+    let tokens = tokenize v
     newTokens <- forM tokens $ \t -> case t of
         (Url x) -> case M.lookup (urlAssetId x) m of
             Nothing -> Left (UndeclaredDependency (AssetId x))

@@ -55,6 +55,6 @@ reverseDependencies :: Handle -> FilePath -> FilePath -> IO [AssetId]
 reverseDependencies h cwd p = do
     s <- atomically $ readTVar (state h)
     return $ catMaybes $ (flip map) (M.toList $ assets s) $ \(aId, ars) ->
-        if (S.member p $ S.map (\x -> cwd </> x) (arsSources ars))
+        if (S.member p $ S.map (\x -> normalise (cwd </> x)) (arsSources ars))
             then Just aId
             else Nothing

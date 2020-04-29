@@ -45,7 +45,7 @@ stylesheetBuilder :: String -> Handle -> AssetId -> IO Builder
 stylesheetBuilder src _ _ = do
     body <- T.readFile src
 
-    let Right tokens = tokenize body
+    let tokens = tokenize body
 
     return $ Builder
         { assetSources      = S.singleton src

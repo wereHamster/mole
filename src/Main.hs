@@ -18,7 +18,6 @@ import qualified Data.ByteString as BS
 import           Data.Text (Text)
 import qualified Data.Text as T
 
-import           Data.Monoid
 import           Data.List hiding (stripPrefix)
 
 import           Network.URI
@@ -227,7 +226,7 @@ assetRead at = ReadM $ do
     v <- askText
     case T.splitOn "=" v of
         [aId, p] -> return $ ad aId $ PublicIdentifier p
-        _ -> fail "ASSET=DEFINITION"
+        _ -> lift $ throwE $ ErrorMsg "ASSET=DEFINITION"
 
   where
     ad aId p = case at of
@@ -260,7 +259,7 @@ parsePaths = option pathRead
         v <- askText
         case map T.unpack $ T.splitOn ":" v of
             (x:xs) -> return $ x:xs
-            _ -> fail "SEARCH:PATH:DIRS:..."
+            _ ->  lift $ throwE $ ErrorMsg "SEARCH:PATH:DIRS:..."
 
 
 withInfo :: Parser a -> String -> ParserInfo a

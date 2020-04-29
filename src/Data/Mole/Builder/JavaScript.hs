@@ -8,7 +8,6 @@ import qualified Data.Map as M
 import           Data.Map (Map)
 
 import           Data.Maybe
-import           Data.Monoid
 
 import qualified Data.Text.IO       as T
 import qualified Data.Text.Encoding as T

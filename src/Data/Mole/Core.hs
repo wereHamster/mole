@@ -16,7 +16,6 @@ import           Data.ByteString (ByteString)
 import qualified Data.Text as T
 
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Time
 
 import           Data.Mole.Types

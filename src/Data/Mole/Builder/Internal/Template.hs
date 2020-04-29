@@ -11,7 +11,6 @@ import qualified Data.Text as T
 import qualified Data.Attoparsec.Text as AP
 
 import           Data.Maybe
-import           Data.Monoid
 import           Data.Mole.Types
 
 
