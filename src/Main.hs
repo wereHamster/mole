@@ -68,11 +68,16 @@ run opt (Build outputDir) = do
     config <- mkConfig opt outputDir
     h <- newHandle config
 
-
     forM_ (entryPoints config) $ \aId ->
         markDirty h aId
 
     _ <- require h (S.fromList $ entryPoints config)
+
+    aids <- atomically $ do
+        s <- readTVar (state h)
+        let assetIds = M.keys $ M.filter (\ars -> case arsState ars of Completed _ -> True; Failed _ -> True; _ -> False) (M.restrictKeys (assets s) (S.fromList $ entryPoints config))
+        if length assetIds /= (length (entryPoints config)) then retry else pure assetIds
+
     atomically $ do
         e <- isEmptyTQueue (messages h)
         unless e retry
