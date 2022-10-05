@@ -58,7 +58,7 @@ It can't expand references (e.g. replace one script
 tag with multiple script tags in a HTML file) or the opposite, compile bundles
 from multiple files
 (e.g. replace multiple script tags with a single script tag referencing the compiled bundle). With the
-adoption of HTML2 bundling becomes largely irrelevant anyways.
+adoption of HTTP/2 bundling becomes largely irrelevant anyways.
 
 There are cases where bundling is useful, but those require more complex
 transformation of the source files. For example when using sprites the tool has to
